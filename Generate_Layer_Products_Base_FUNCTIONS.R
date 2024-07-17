@@ -4,13 +4,9 @@
 # Luisa Pflumm
 #'####################################################################################################################
 
-
 #'####################################################################################################################
 # SET CUSTOM PARAMETER ####
-
-
 ### Function to list mission folders and flight paths
-
 list_all_flight_paths <- function(root_path) {
   # List all folders in root folder
   all_folders <- list.files(root_path, full.names = TRUE, recursive = FALSE)
@@ -35,9 +31,7 @@ list_all_flight_paths <- function(root_path) {
 
 
 
-
 ### Function to print flight paths matching mission
-
 list_mission_flight_paths <- function(root_path, mission) {
   # List all folders in root folder
   all_folders <- list.files(root_path, full.names = TRUE, recursive = FALSE)
@@ -88,9 +82,7 @@ list_mission_flight_paths <- function(root_path, mission) {
 
 
 
-
 ### Function to split path into tiles and select last folder (=Flightname)
-
 select_flightname <- function(path) {
   split_result <- strsplit(path, "/")[[1]]
   return(split_result[length(split_result)])
@@ -105,6 +97,8 @@ get_current_time <- function() {
   return(current_time)
 }
 
+
+
 # Function to return current date
 get_current_date <- function() {
   return(Sys.Date())
@@ -112,12 +106,10 @@ get_current_date <- function() {
 
 
 
-
 # Function to check if file exists
 file_exists <- function(file_path) {
   file.exists(file_path)
 }
-
 
 
 
@@ -135,7 +127,7 @@ userPromt_outputTXTfile <- function(file_path) {
       return(FALSE) # Create new file with a different name
     } else {
       cat("Invalid input. Please enter 'o' or 'a'.\n")
-      handle_user_prompt(file_path)  # Recursive call to handle invalid input
+      userPromt_outputTXTfile(file_path)  # Recursive call to handle invalid input
     }
   } else {
     return(TRUE)  # File does not exist, proceed to write new file
@@ -144,54 +136,109 @@ userPromt_outputTXTfile <- function(file_path) {
 
 
 
-
-
-
 #'####################################################################################################################
 # IMPORT FILES ####
 
-
-### Function to check if .tif, .prj and .tfw files are existing in folder and load the raster file
-
-import_dem_l1 <- function(FlightPath, FlightName) {
-  # Construct the full paths
-  base_path <- paste0(FlightPath, "4_RawOutput/", FlightName)
-  tif_file <- paste0(base_path, ".tif")
-  prj_file <- paste0(base_path, ".prj")
-  tfw_file <- paste0(base_path, ".tfw")
-  
-  # Check if the .tif file exists
-  if (!file.exists(tif_file)) {
-    stop(paste("No DEM was found in", base_path, "folder"))
-  }
-  
-  # Check if the .prj and .tfw files exist and print a warning if they do not
-  if (!file.exists(prj_file)) {
-    warning(paste("Warning: .prj file does not exist in", base_path, "folder"))
-  }
-  if (!file.exists(tfw_file)) {
-    warning(paste("Warning: .tfw file does not exist in", base_path, "folder"))
-  }
-  
-  # Load the .tif file
-  raster_data <- rast(tif_file)
-  
-  # Return the raster data
-  return(raster_data)
+### Function to check if raw output files are exsisting (.tif, .prj, .tfw and .las files for Lidar, .tif for all others) and import them
+import_raw_output <- function(FlightPath, FlightName) {
+  if (endsWith(FlightName, "DJIM300L1")) {
+    # Construct the full paths
+    base_path <- paste0(FlightPath, "4_RawOutput/", FlightName)
+    tif_file <- paste0(base_path, "_DEM.tif")
+    prj_file <- paste0(base_path, "_DEM.prj")
+    tfw_file <- paste0(base_path, "_DEM.tfw")
+    las_file <- (paste0(base_path, ".las"))    # -> what to select? select = "xyzi"
+    #las_file <- system.file("extdata", "MixedConifer.laz", package ="lidR")
+    # Check if the .tif file exists
+    if (!file.exists(tif_file)) {
+      stop(paste("No DEM was found in", base_path, "folder"))
+    }
+    
+    # Check if the .prj and .tfw files exist and print a warning if they do not
+    if (!file.exists(prj_file)) {
+      warning(paste("Warning: .prj file does not exist in", base_path, "folder"))
+    }
+    if (!file.exists(tfw_file)) {
+      warning(paste("Warning: .tfw file does not exist in", base_path, "folder"))
+    }
+    
+    # Check if the .las file exists
+    if (!file.exists(las_file)) {
+      stop(paste("No Point Cloud was found in", base_path, "folder"))
+    }
+    
+    # Load the .tif file
+    raster_data <- rast(tif_file)
+    
+    # Load the .las file
+    lidar_data <- readLAS(las_file)
+    
+    # Return the raster and las data in list
+    return(list(dem = raster_data, pointcloud = lidar_data))
+    
+    } else {
+      # Construct the full paths
+      base_path <- paste0(FlightPath, "4_RawOutput/", FlightName)
+      tif_file1 <- paste0(base_path, "_DSM.tif")
+      tif_file2 <- paste0(base_path, "_OM.tif")
+      
+      # Check if the .tif files exists
+      if (!file.exists(tif_file1)) {
+        stop(paste("No DSM was found in", base_path, "folder"))
+      }
+      
+      if (!file.exists(tif_file2)) {
+        stop(paste("No OM was found in", base_path, "folder"))
+      }
+      
+      # Load the .tif files
+      raster_data1 <- rast(tif_file1)
+      raster_data2 <- rast(tif_file2)
+      
+      # Return the raster data in list
+      return(list(dsm = raster_data1, om = raster_data2))
+    }
 }
 
 
 
+# Function to trim a raster
+trim_raster <- function(raster) {
+  return(trim(raster))
+}
+
+
+
+# Function to plot raster (if more than one bands plot first band)
+plot_raster <- function(raster) {
+  if (nlyr(raster) > 1) {
+    # Extract and plot the first band
+    first_band <- raster[[1]]
+    #names <- strsplit(names(raster), "_")[[1]]
+    plot(first_band, main = paste0(names(first_band), " - band 1"))
+  } else {
+    # Plot the entire raster
+    plot(raster, main = paste0(names(raster)))
+  }
+  return(NULL)
+}
+# names <- strsplit(names(raster), "_")[[1]]
+# #par(mfrow = c(1, 2))
+# plot(raster, main = paste0(toupper(names(raw_output[1]))," from ", FlightName))
+# plot(r2[[1]], main = paste0(toupper(names(raw_output[2]))," from ", FlightName, " - band 1"))
+# #plotRGB(r2, r = 3, g = 2, b = 1, stretch = "lin")
+
+
 
 # Function to check CRS and extent validity
-check_raster_validity <- function(raster_path) {
+check_raster_validity_info <- function(raster_path) {
   # Load the raster
   raster_data <- rast(raster_path)
   
   # Check if CRS is valid
-  crs_valid <- !is.na(crs(raster_data))
+  crs_valid <- !is.na(terra::crs(raster_data))
   crs_interpretable <- tryCatch({
-    crs(raster_data)
+    terra::crs(raster_data)
     TRUE
   }, error = function(e) {
     FALSE
@@ -203,15 +250,37 @@ check_raster_validity <- function(raster_path) {
   # Check if extent values are finite
   extent_valid <- all(is.finite(c(raster_extent$xmin, raster_extent$xmax, raster_extent$ymin, raster_extent$ymax)))
   
+  # Get the resolution of the raster
+  r_res <- res(raster_data)
+  
+  # # Extract the first part of the resolution vector
+  # first_part <- r_res[1]
+  # 
+  # # Check if the raster resolution is floating number and optionally replace '.' with '-'
+  # if (grepl("\\.", as.character(first_part))) {
+  #   # Replace '.' with '-'
+  #   res <- gsub("\\.", "-", as.character(first_part))
+  # } else {
+  #   # Keep the first part as it is
+  #   res <- as.character(first_part)
+  # }
+  
+  # Get EPSG code of the raster
+  r_epsg <- as.numeric(terra::crs(raster_data, describe = TRUE)$code)
+  
+  
   # Print results
   if (crs_valid && crs_interpretable) {
+    cat(names(raster_path[[1]]), "\n")
     cat("CRS is valid and interpretable: ")
-    cat(crs(raster_data, proj = TRUE), "\n" )
+    cat(terra::crs(raster_data, proj = TRUE), "\n" )
   } else {
     cat("CRS is either invalid or not interpretable.\n")
   }
-  
+
   if (extent_valid) {
+    cat("EPSG code: ", r_epsg, "\n")
+    cat("Pixel resolution: ", r_res, "\n")
     cat("Extent details:\n")
     cat("xmin:", raster_extent$xmin, "\n")
     cat("xmax:", raster_extent$xmax, "\n")
@@ -219,463 +288,324 @@ check_raster_validity <- function(raster_path) {
     cat("ymax:", raster_extent$ymax, "\n")
   } else {
     cat("Extent is invalid.\n")
+    
   }
+  
+  # Prepare output in a list
+  output <- list(
+    raster_path = raster_path,
+    crs_valid = crs_valid,
+    crs_interpretable = crs_interpretable,
+    extent_valid = extent_valid,
+    resolution = r_res, 
+    #resolution_x = res, 
+    epsg = r_epsg,
+    extent_details = raster_extent
+  )
   
   # Return the results as a list
-  return(list(crs_valid = crs_valid, crs_interpretable = crs_interpretable, extent_valid = extent_valid))
+  return(output)
 }
 
 
 
-# # Function to transform CRS of aoi to CRS of raster (<< operator assigns values to global variables within the function; however, it's generally better practice to use list returns to avoid modifying the global environment)
-# transform_sf_to_raster_crs <- function(sf_object, raster_path) {
-#   # Load the raster
-#   spatialRaster <- rast(raster_path)
-#   
-#   # Extract EPSG code from raster CRS
-#   r_epsg <<- as.numeric(crs(spatialRaster, describe = TRUE)$code)
-#   
-#   # Extract the extent of the raster
-#   r_extent <<- ext(spatialRaster)
-#   
-#   # Transform the sf object to the raster CRS
-#   transformed_sf <<- st_transform(sf_object, r_epsg)
-# }
-
-
-
-
-
-
-get_resolution_info <- function(raster_path) {
-  # Load the raster
-  spatialRaster <- rast(raster_path)
+# Function to get the correct UTM EPSG code for a raster
+get_utm_epsg <- function(raster) {
   
-  # Get the resolution of the raster
-  r_res <- res(spatialRaster)
+  # Get the CRS of the raster
+  crs <- terra::crs(raster, describe=T)
+  crs <- as.numeric(crs$code)
   
-  # Extract the first part of the resolution vector
-  first_part <- r_res[1]
-  
-  # Check if the raster resolution is floating number and optionally and replace '.' with '-'
-  if (grepl("\\.", as.character(first_part))) {
-    # Replace '.' with '-'
-    res <- gsub("\\.", "-", as.character(first_part))
-  } else {
-    # Keep the first part as it is
-    res <- as.character(first_part)
+  # Check if the EPSG code is 4326
+  if (crs == 4326) {
+    # Get the extent of the raster
+    extent <- ext(raster)
+    
+    # Calculate the center of the raster extent
+    center_lon <- (extent$xmin + extent$xmax) / 2
+    center_lat <- (extent$ymin + extent$ymax) / 2
+    
+    # Determine the UTM zone based on the center longitude
+    utm_zone <- floor((center_lon + 180) / 6) + 1
+    
+    # Determine the EPSG code for the appropriate UTM zone
+    epsg_code <- ifelse(center_lat >= 0, 32600 + utm_zone, 32700 + utm_zone)
+    
+    } else {
+      # Return the current EPSG code of the raster's CRS
+      epsg_code <- crs
   }
   
-  # Return both variables
-  return(list(raster_res = r_res, res_exp = res))
+  return(epsg_code)
 }
 
 
 
+# Function to project rasters to correct UTM and return a list
+project_raster_list <- function(raster_list) {
+  # Internal function to project a single raster
+  project_raster <- function(raster) {
+    new_epsg <- get_utm_epsg(raster)
+    projected_raster <- terra::project(raster, paste0("epsg:", new_epsg))
+    return(projected_raster)
+  }
+  
+  # Apply the projection function to each raster in the list
+  projected_rasters <- lapply(raster_list, project_raster)
+  
+  return(projected_rasters)
+}
+
+
+
+# Function to determine adequate buffer that should be applied around AOI for raster clip to avoid edge effects in statistical analyses 
+# -> the buffer should be ideally be 10 * pixel-resolution, if exceeding raster extent use factor 5. Otherwise no buffer will be applied to AOI.
+apply_buffer_check <- function(aoi, raster) {
+  # Get the pixel resolution (assuming square pixels)
+  res <- res(raster)
+  pixel_resolution <- min(res) # Using the minimum resolution as the pixel resolution
+
+  # Define buffer sizes
+  buffer_10x <- 10 * pixel_resolution
+  buffer_5x <- 5 * pixel_resolution
+
+  # Function to check if buffered AOI is within raster extent
+  is_within_raster_extent <- function(buffered_aoi, raster) {
+    raster_extent <- as.polygons(ext(raster), crs = terra::crs(raster))
+    raster_extent_sf <- st_as_sf(raster_extent)
+    st_within(buffered_aoi, raster_extent_sf, sparse = FALSE)
+  }
+
+  # Apply 10x buffer and check
+  buffered_aoi_10x <- st_buffer(aoi, dist = buffer_10x)
+  if (all(is_within_raster_extent(buffered_aoi_10x, raster))) {
+    print(paste0(names(raster[[1]]), ": A buffer of factor 10 (", buffer_10x, "m) was applied to AOI."))
+    return(list(aoiBuff_sf = buffered_aoi_10x, buff = buffer_10x))
+  } else {
+    # Apply 5x buffer and check
+    buffered_aoi_5x <- st_buffer(aoi, dist = buffer_5x)
+    if (all(is_within_raster_extent(buffered_aoi_5x, raster))) {
+      print(paste0(names(raster[[1]]), "A buffer of factor 5 (", buffer_5x, "m) was applied to AOI."))
+      return(list(aoiBuff_sf = buffered_aoi_5x, buff = buffer_5x))
+    } else {
+      # No buffer can be applied
+      warning("No buffer can be applied to AOI; returned original AOI")
+      return(NULL)
+    }
+  }
+}
+
+# Wrapper function to apply the `apply_buffer_check`-function to a list of rasters
+apply_buffer_check_to_list <- function(aoi, raster_list) {
+  lapply(raster_list, function(raster) {
+    apply_buffer_check(aoi, raster)
+  })
+}
+
+
+
+# Function to clip rasters in a list with corresponding AOIs from another list
+clip_rasters_with_aoi_list <- function(utm_raster_list, aoiBuff_list) {
+  # Initialize the output list
+  clipped_raster_buff_list <- list()
+  
+  # Iterate over the names in the lists and perform the clipping
+  for (name in names(utm_raster_list)) {
+    # Retrieve the corresponding raster and AOI
+    raster <- utm_raster_list[[name]]
+    aoi <- aoiBuff_list[[name]]$aoiBuff_sf
+    
+    # Check if the AOI is not null
+    if (!is.null(aoi)) {
+      # Clip the raster with the AOI
+      clipped_raster <- crop(raster, aoi)
+      
+      # Mask the raster with the AOI
+      clipped_raster <- terra::mask(clipped_raster, aoi)
+      
+      # Store the clipped raster in the output list
+      clipped_raster_buff_list[[name]] <- clipped_raster
+    } else {
+      warning(paste("No AOI found for", name, "; skipping this raster."))
+    }
+  }
+  
+  # Return the list of clipped rasters
+  return(clipped_raster_buff_list)
+}
+
+
+
+# Function to clip rasters in a list with a single AOI
+clip_rasters_with_aoi_sf <- function(utm_raster_list, aoi_utm) {
+  # Initialize the output list
+  clipped_raster_list <- list()
+  
+  # Iterate over the names in the utm_raster_list and perform the clipping
+  for (name in names(utm_raster_list)) {
+    # Retrieve the corresponding raster
+    raster <- utm_raster_list[[name]]
+    
+    # Clip the raster with the AOI
+    clipped_raster <- crop(raster, aoi_utm)
+    
+    # Mask the raster with the AOI
+    clipped_raster <- terra::mask(clipped_raster, aoi_utm)
+    
+    # Store the clipped raster in the output list
+    clipped_raster_list[[name]] <- clipped_raster
+  }
+  
+  # Return the list of clipped rasters
+  return(clipped_raster_list)
+}
 
 
 
 #'####################################################################################################################
 # EXPORT FILES ####
 
-# Function to handle user prompt and export raster
-userPromt_rasterExport <- function(raster, output_tif) {
-  # Check if file exists
-  if (file_exists(output_tif)) {
-    # Prompt user for input
-    user_input <- readline(prompt = "Output TIFF already exists. Do you want to overwrite it? (yes/no): ")
+# Function to define band names depending on System
+system_bands <- function(FlightName){
+  if (endsWith(FlightName, "DJIM300L1")){
+    bands <- list(dem = "DEM")
     
-    # Process user input
-    if (tolower(user_input) == "yes") {
-      # Overwrite existing file
-      writeRaster(raster, filename = output_tif, overwrite = TRUE)
-      cat("Raster exported (overwritten):", output_tif, "\n")
-    } else if (tolower(user_input) == "no") {
-      # Export with a new filename
-      new_filename <- paste0(tools::file_path_sans_ext(output_tif), "_new.tif")
-      writeRaster(raster, filename = new_filename)
-      cat("Raster exported (new file):", new_filename, "\n")
-    } else {
-      cat("Invalid input. Please enter 'yes' or 'no'.\n")
-      handle_user_prompt_and_export(raster, output_tif)  # Recursive call to handle invalid input
+  } else if (endsWith(FlightName, "DJIM300MXDual")){
+    bands <- list(dsm = "DSM", 
+                  om = c("CBlue-444", "Blue-475", "Green-531", "Green-560", "Red-650", "Red-668", "Red-edge-705", "Red-edge-717", "Red-edge-740", "NIR-840")) # band info from https://support.micasense.com/hc/en-us/articles/214878778-What-is-the-center-wavelength-and-bandwidth-of-each-filter-for-MicaSense-sensors & https://agisoft.freshdesk.com/support/solutions/articles/31000161029-how-to-add-micasense-rededge-mx-dual-data-properly
+    
+    # } else if (endsWith(FlightName, "DJIM300H20T")){
+    #   bands <- list(dsm = "DSM", 
+    #                 om = c("???"))
+    
+  } else if (endsWith(FlightName, "WingtraAltum")){
+    bands <- list(dsm = "DSM", 
+                  om = c("Blue", "Green", "Red", "Red-edge717", "NIR", "LWIR"))
+    
+  } else if (endsWith(FlightName, "WingtraRX1RII")){
+    bands <- list(dsm = "DSM", 
+                  om = c("Blue", "Green", "Red"))
+    
+  }
+  return(bands)
+}
+
+
+
+# Function to round and format resolution
+round_and_format <- function(resolution) {
+    # Round the first part to three decimal places
+  rounded <- round(as.numeric(resolution), digits = 3)
+  
+  # Format the rounded value
+  formatted <- gsub("\\.", "-", as.character(rounded))
+  
+  return(formatted)
+}
+
+
+
+# Function to process raster_info list and generate rounded res export name
+process_raster_info <- function(raster_info) {
+  resolution_x_list <- lapply(raster_info, function(info) {
+    resolution <- info$resolution[1]
+    resolution_x <- round_and_format(resolution)
+    return(resolution_x)
+  })
+  return(resolution_x_list)
+}
+
+
+
+# Function to rename bands of spatialRaster and add FlightName to each band name
+rename_bands <- function(FlightName, raster_list, raster_info){
+  # Get the system bands based on FlightName
+  bands <- system_bands(FlightName)
+  
+  # Process raster_info to get the resolutions
+  resolution_x_list <- process_raster_info(raster_info)
+  
+  # Use lapply to iterate over the items in raster_list and rename bands
+  raster_list <- lapply(names(raster_list), function(name) {
+    raster <- raster_list[[name]]
+    if (!is.null(bands[[name]])) {
+      # Add FlightName and resolution to each band name
+      new_band_names <- paste0(FlightName, "_", bands[[name]], "_res", resolution_x_list[[name]])
+      names(raster) <- new_band_names
     }
-  } else {
-    # File does not exist, proceed to export
-    writeRaster(raster, filename = output_tif)
-    cat("Raster exported:", output_tif, "\n")
-  }
-}
-
-# # Check if file exists and decide: overwrite or add new raster?  (-> UNSOLVED ERROR)
-# user_decision_export_raster <- userPromt_rasterExport(r_l1_clip_aoi, ExportRaster)
-# # # UNSOLVED ISSUE: 
-# # terra::writeRaster(r_l1_clip_aoi, filename = ExportRaster, overwrite = TRUE)
-# # # -> Error [writeRaster] cannot overwrite existing file
-
-
-# Function to export raster as TIFF
-export_raster <- function(raster, output_tif) {
-  if (file_exists(output_tif)) {
-    # File exists, generate new filename with "_new.tif"
-    new_filename <- paste0(tools::file_path_sans_ext(output_tif), "_new.tif")
-    writeRaster(raster, filename = new_filename)
-    cat("Raster exported (new file with _new.tif):", new_filename, "\n")
-  } else {
-    # File does not exist, proceed to export
-    writeRaster(raster, filename = output_tif)
-    cat("Raster exported:", output_tif, "\n")
-  }
+    return(raster)
+  })
+  
+  # Preserve the names of the original raster_list
+  names(raster_list) <- names(raster_info)
+  
+  return(raster_list)
 }
 
 
 
 
+# Function to generate export filename for buffered raster
+generate_export_buff_path <- function(ExportPath, FlightName, type, resolution_x, buffer_x) {
+  current_date <- format(Sys.Date(), "%Y%m%d")
+  ExportPathBuff <- paste0(ExportPath, "bufferedRaster/")
+  if (!dir.exists(ExportPathBuff)) {
+    dir.create(ExportPathBuff, recursive = TRUE)
+  }
+  export_buff_name <- paste0(ExportPathBuff, FlightName, "_", toupper(type), "_res", resolution_x, "m_buff", buffer_x, "m_", current_date, ".tif")
+  return(export_buff_name)
+}
 
 
 
+# Function to generate export filename
+generate_export_path <- function(ExportPath, FlightName, type, resolution_x) {
+  current_date <- format(Sys.Date(), "%Y%m%d")
+  export_name <- paste0(ExportPath, FlightName, "_", toupper(type), "_res", resolution_x, "m_", current_date, ".tif")
+  return(export_name)
+}
 
 
 
-
-
-
+# Function to export raster as TIFF with a generated name
+export_rasters <- function(clipped_rasters_buff_list, ExportPath, FlightName, raster_info, aoiBuff) {
+  # Process raster_info to get the resolutions
+  resolution_x_list <- process_raster_info(raster_info)
+  
+  # Iterate over the items in clipped_rasters_buff_list and export them to subfolder "bufferedRaster" in 0_Raster
+  lapply(names(clipped_rasters_buff_list), function(name) {
+    raster <- clipped_rasters_buff_list[[name]]
+    resolution_x <- resolution_x_list[[name]]
+    buffer <- aoiBuff[[name]][[2]]
+    buffer_x <- round_and_format(buffer)
+    export_path_buff <- generate_export_buff_path(ExportPath, FlightName, name, resolution_x, buffer_x)
+    
+    # Get band names for multi-band rasters
+    band_names <- names(raster)
+    
+    writeRaster(raster, filename = export_path_buff, names = band_names, overwrite = TRUE)
+    cat("Raster exported:", export_path_buff, "\n")
+  })
+  
+  # Clip all buffered raster to aoi and export them to final 0_Raster folder
+  clipped_rasters_list <- clip_rasters_with_aoi_sf(clipped_rasters_buff_list, aoi_utm)
+  
+  # Iterate over the items in clipped_rasters_list and export them
+  lapply(names(clipped_rasters_list), function(name) {
+    raster <- clipped_rasters_list[[name]]
+    resolution_x <- resolution_x_list[[name]]
+    export_path <- generate_export_path(ExportPath, FlightName, name, resolution_x)
+    
+    # Get band names for multi-band rasters
+    band_names <- names(raster)
+    
+    writeRaster(raster, filename = export_path, names = band_names, overwrite = TRUE)
+    cat("Raster exported:", export_path, "\n")
+  })
+}
 
 
 
 
 #'####################################################################################################################
-# ATTEMPTS (not finished) ####
-#
-# ### Automatically determine flight path based on custom Mission & System variable.
-#
-# ### Select custom parameter (from table)
-# mission <- ""
-# system <- ""
-#
-#'======================================================================================================================  
-# # -> PART RIGHT NOW NOT WORKING for Saarland, Luebeck and Passau. For all others it does.
-# # -> MAYBE ADJUST ANOTHER TIME; THEN DON'T FORGET TO REFER TO `mission_aoi` VARIABLE IN SUBSEQUENT CODE
-#
-# ### Select sub-site (if existing)
-# 
-# # Function to assign subsite to mission if existing
-# assign_mission_subsite <- function(mission) {
-#   if (mission == "20230823_Luebeck") {
-#     aoi_specification <- readline(prompt = "Specify AOI for Lübeck mission ( 1 for AOI1 in the South, 2 for AOI2 in the North): ")
-#     
-#     # Validate the input and update the mission accordingly
-#     if (aoi_specification == "1") {
-#       mission_aoi <- "20230823_LuebeckSouth"
-#       print("AOI1 in the South was selected.")
-#     } else if (aoi_specification == "2") {
-#       mission_aoi <- "20230823_LuebeckNorth"
-#       print("AOI2 in the North was selected.")
-#     } else {
-#       stop("Invalid AOI specification")
-#     }
-#     
-#   } else if (mission == "20230615_Passau") {
-#     aoi_specification <- readline(prompt = "Specify AOI for Passau mission ( 1 for AOI1 in the North, 2 for AOI2 in the South): ")
-#     
-#     # Validate the input and update the mission accordingly
-#     if (aoi_specification == "1") {
-#       mission_aoi <- "20230615_PassauAOI1_TF80"
-#       print("AOI1 in the North was selected, with TF 80 (terrain following at 80m height).")
-#     } else if (aoi_specification == "2") {
-#       mission_aoi <- "20230615_PassauAOI2_TF90"
-#       print("AOI2 in the South  was selected, with TF 90 (terrain following at 90m height).")
-#     } else {
-#       stop("Invalid AOI specification")
-#     }
-#   
-#   } else if (mission == "20230921_Saarland" && system == "WingtraAltum") {
-#     aoi_specification <- readline(prompt = "Specify AOI for Saarland mission with WingtraAltum system ( 1 for AOI1 in the West, 2 for AOI2 in the Middle, 3 for AOI3 in the East): ")
-#     
-#     # Validate the input and update the mission accordingly
-#     if (aoi_specification == "1") {
-#       mission_aoi <- "20230921_SaarlandAOI1"
-#       print("AOI1 in the West was selected.")
-#     } else if (aoi_specification == "2") {
-#       mission_aoi <- "20230921_SaarlandAOI2"
-#       print("AOI2 in the Middle was selected.")
-#     } else if (aoi_specification == "3") {
-#       mission_aoi <- "20230921_SaarlandAOI3"
-#       print("AOI3 in the East was selected.")
-#     } else {
-#       stop("Invalid AOI specification")
-#     } 
-#     
-#   } else if (mission == "20230921_Saarland" && system != "WingtraAltum") {
-#     aoi_specification <- readline(prompt = "Specify AOI for Saarland mission ( 1 for combined AOI1 & AOI2 in the West, 2 for AOI3 in the East): ")
-#     
-#     # Validate the input and update the mission accordingly
-#     if (aoi_specification == "1") {
-#       mission_aoi <- "20230921_SaarlandAOI1-2"
-#       print("Combined AOI1 & AOI2 in the West was selected.")
-#     } else if (aoi_specification == "2") {
-#       mission_aoi <- "20230921_SaarlandAOI3"
-#       print("AOI3 in the East was selected.")
-#     } else {
-#       stop("Invalid AOI specification")
-#     } 
-#     
-#   } else {
-#     mission_aoi <- mission  # Default assignment
-#   }
-#   
-#   return(mission_aoi)
-# }
-# 
-# # Example usage
-# mission_aoi <- assign_mission_subsite(mission)
-# print(mission_aoi)
-#'======================================================================================================================  
-# 
-# ### Select required flight path
-# 
-# # Define the function
-# select_flight_path <- function(paths, mission, system) {
-#   # Check if mission is "yyy" or "xxx" for manual insertion
-#   if (mission %in% c("20230921_Saarland", "20230615_Passau", "20230823_Luebeck")) {
-#     FlightPath <- readline(prompt = paste("Specify required Flight path for", mission, "mission (use / and NO quotation marks): "))   #EXAMPLE: F:/ForestSinglePlots/20230823_Luebeck/0_Flights/20230823_LuebeckNorth_DJIM300L1
-#     print(FlightPath)
-#     return(FlightPath)
-#   } else {
-#     
-#     # Iterate through each path
-#     for (path in paths) {
-#       # Split the path by "/"
-#       split_path <- strsplit(path, "/")[[1]]
-#       
-#       # Get the last folder name
-#       last_folder <- tail(split_path, n = 1)
-#       
-#       # Split the last folder name by "_"
-#       split_folder <- strsplit(last_folder, "_")[[1]]
-#       
-#       # Check if the first two parts match the mission and the last part matches the system
-#       if (length(split_folder) >= 3) {
-#         # Construct the mission part from the first two parts
-#         mission_part <- paste(split_folder[1], split_folder[2], sep = "_")
-#         
-#         # Check for match
-#         if (mission_part == mission && split_folder[length(split_folder)] == system) {
-#           return(path)
-#           print(path)
-#         }
-#       } 
-#     }
-#     
-#     # If no match is found, return NULL
-#     stop("Execution stopped. Could not find flight path for selected mission and system.\n Check if required flight name contains date, aoi, and system. Alternatively check for spelling mistake in custom parameter.")
-#   }
-# }
-# 
-# # Call the function
-# FlightPath <- select_flight_path(all_flight_folders, mission, system)
-# 
-# # Print the matching path
-# print(FlightPath)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#' 
-#' 
-#' 
-#' #'####################################################################################################################
-#' # DERIVE PATHS ####
-#' 
-#' ### List files
-#' 
-#' # List all folders in root folder
-#' all_folders <- list.files(RootPath, full.names = TRUE, recursive = FALSE)
-#' 
-#' # Filter folders that match the pattern "yyyymmdd_name" 
-#' pattern <- "^\\d{8}_.+"    # (\\d{8} matches exactly 8 digits; _ matches the underscore character; .+ matches one or more characters following the underscore)
-#' mission_folders <- all_folders[grepl(pattern, basename(all_folders))]
-#' 
-#' # Check if the length of mission_folders is not equal to 13
-#' if (length(mission_folders) != 13) {
-#'   stop("Please check if all 13 overall flight missions are stored in root-folder and modify code if this number is outdated.")
-#' } else {
-#'   print("Correct number of mission folders found.")
-#' }
-#' 
-#' # Print the mission folders
-#' print(mission_folders)
-#' #strsplit(mission_folders, "/")
-#' 
-#' # List all flight paths
-#' all_flight_folders <- list.files(paste0(mission_folders, "/0_Flights/"), full.names = TRUE, recursive = FALSE)
-#' print(all_flight_folders)
-#' 
-#' 
-#' 
-#' #'====================================================================================================================
-#' # -> PART RIGHT NOW NOT WORKING; MAYBE ADJUST ANOTHER TIME; THEN DON'T FORGET TO REFER TO `mission_aoi` VARIABLE IN SUBSEQUENT CODE
-#' # ### Select sub-site (if existing)
-#' # 
-#' # # Function to assign subsite to mission if existing
-#' # assign_mission_subsite <- function(mission) {
-#' #   if (mission == "20230823_Luebeck") {
-#' #     aoi_specification <- readline(prompt = "Specify AOI for Lübeck mission ( 1 for AOI1 in the South, 2 for AOI2 in the North): ")
-#' #     
-#' #     # Validate the input and update the mission accordingly
-#' #     if (aoi_specification == "1") {
-#' #       mission_aoi <- "20230823_LuebeckSouth"
-#' #       print("AOI1 in the South was selected.")
-#' #     } else if (aoi_specification == "2") {
-#' #       mission_aoi <- "20230823_LuebeckNorth"
-#' #       print("AOI2 in the North was selected.")
-#' #     } else {
-#' #       stop("Invalid AOI specification")
-#' #     }
-#' #     
-#' #   } else if (mission == "20230615_Passau") {
-#' #     aoi_specification <- readline(prompt = "Specify AOI for Passau mission ( 1 for AOI1 in the North, 2 for AOI2 in the South): ")
-#' #     
-#' #     # Validate the input and update the mission accordingly
-#' #     if (aoi_specification == "1") {
-#' #       mission_aoi <- "20230615_PassauAOI1_TF80"
-#' #       print("AOI1 in the North was selected, with TF 80 (terrain following at 80m height).")
-#' #     } else if (aoi_specification == "2") {
-#' #       mission_aoi <- "20230615_PassauAOI2_TF90"
-#' #       print("AOI2 in the South  was selected, with TF 90 (terrain following at 90m height).")
-#' #     } else {
-#' #       stop("Invalid AOI specification")
-#' #     }
-#' #   
-#' #   } else if (mission == "20230921_Saarland" && system == "WingtraAltum") {
-#' #     aoi_specification <- readline(prompt = "Specify AOI for Saarland mission with WingtraAltum system ( 1 for AOI1 in the West, 2 for AOI2 in the Middle, 3 for AOI3 in the East): ")
-#' #     
-#' #     # Validate the input and update the mission accordingly
-#' #     if (aoi_specification == "1") {
-#' #       mission_aoi <- "20230921_SaarlandAOI1"
-#' #       print("AOI1 in the West was selected.")
-#' #     } else if (aoi_specification == "2") {
-#' #       mission_aoi <- "20230921_SaarlandAOI2"
-#' #       print("AOI2 in the Middle was selected.")
-#' #     } else if (aoi_specification == "3") {
-#' #       mission_aoi <- "20230921_SaarlandAOI3"
-#' #       print("AOI3 in the East was selected.")
-#' #     } else {
-#' #       stop("Invalid AOI specification")
-#' #     } 
-#' #     
-#' #   } else if (mission == "20230921_Saarland" && system != "WingtraAltum") {
-#' #     aoi_specification <- readline(prompt = "Specify AOI for Saarland mission ( 1 for combined AOI1 & AOI2 in the West, 2 for AOI3 in the East): ")
-#' #     
-#' #     # Validate the input and update the mission accordingly
-#' #     if (aoi_specification == "1") {
-#' #       mission_aoi <- "20230921_SaarlandAOI1-2"
-#' #       print("Combined AOI1 & AOI2 in the West was selected.")
-#' #     } else if (aoi_specification == "2") {
-#' #       mission_aoi <- "20230921_SaarlandAOI3"
-#' #       print("AOI3 in the East was selected.")
-#' #     } else {
-#' #       stop("Invalid AOI specification")
-#' #     } 
-#' #     
-#' #   } else {
-#' #     mission_aoi <- mission  # Default assignment
-#' #   }
-#' #   
-#' #   return(mission_aoi)
-#' # }
-#' # 
-#' # # Example usage
-#' # mission_aoi <- assign_mission_subsite(mission)
-#' # print(mission_aoi)
-#' #'====================================================================================================================
-#' 
-#' 
-#' 
-#' 
-#' 
-#' ### Select required flight path
-#' 
-#' # Define the function
-#' select_flight_path <- function(paths, mission, system) {
-#'   # Check if mission is "yyy" or "xxx" for manual insertion
-#'   if (mission %in% c("20230921_Saarland", "20230615_Passau", "20230823_Luebeck")) {
-#'     FlightPath <- readline(prompt = paste("Specify required Flight path for", mission, "mission (use / and NO quotation marks): "))   #EXAMPLE: F:/ForestSinglePlots/20230823_Luebeck/0_Flights/20230823_LuebeckNorth_DJIM300L1
-#'     print(FlightPath)
-#'     return(FlightPath)
-#'   } else {
-#'     
-#'     # Iterate through each path
-#'     for (path in paths) {
-#'       # Split the path by "/"
-#'       split_path <- strsplit(path, "/")[[1]]
-#'       
-#'       # Get the last folder name
-#'       last_folder <- tail(split_path, n = 1)
-#'       
-#'       # Split the last folder name by "_"
-#'       split_folder <- strsplit(last_folder, "_")[[1]]
-#'       
-#'       # Check if the first two parts match the mission and the last part matches the system
-#'       if (length(split_folder) >= 3) {
-#'         # Construct the mission part from the first two parts
-#'         mission_part <- paste(split_folder[1], split_folder[2], sep = "_")
-#'         
-#'         # Check for match
-#'         if (mission_part == mission && split_folder[length(split_folder)] == system) {
-#'           return(path)
-#'           print(path)
-#'         }
-#'       } 
-#'     }
-#'     
-#'     # If no match is found, return NULL
-#'     stop("Execution stopped. Could not find flight path for selected mission and system.\n Check if required flight name contains date, aoi, and system. Alternatively check for spelling mistake in custom parameter.")
-#'   }
-#' }
-#' 
-#' 
-#' # Call the function
-#' FlightPath <- select_flight_path(all_flight_folders, mission, system)
-#' #FlightPath <- "F:/ForestSinglePlots/20230824_BayWaldAOI1/0_Flights/20230824_BayWaldAOI1_DJIM300L1/"
-#' 
-#' 
-#' # Print the matching path
-#' print(FlightPath)
+# END
