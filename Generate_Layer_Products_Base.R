@@ -5,7 +5,8 @@
 # Example area: BayWaldAOI1
 
 # Load libraries
-pacman::p_load(exifr, dplyr, leaflet,RColorBrewer, sf, parallel, viridis, zip, terra)
+pacman::p_load(exifr, dplyr, leaflet,RColorBrewer, sf, parallel, viridis, zip, terra, lidR)
+options(scipen = 100, digits = 4) # avoid numbers with e
 
 #'####################################################################################################################
 #' System           || Mission               | Site                             | NOTE
@@ -34,20 +35,24 @@ RootPath <- "F:/ForestSinglePlots/"
 # List all existing flight folder
 list_all_flight_paths(RootPath)
 # USER: Select mission (from table)
-mission <- "20230824_BayWaldAOI1"
+mission <- "20230823_BayWaldAOI8"
 # List only flight folders of selected mission
-list_mission_flight_paths(RootPath, mission)
+(list_mission_flightpaths <- list_mission_flight_paths(RootPath, mission))
 # USER: Select path to flight folder
-FlightPath <- "F:/ForestSinglePlots/20230824_BayWaldAOI1/0_Flights/20230824_BayWaldAOI1_DJIM300L1/"
-# USER: Set buffer (will be applied to aoi for raster clipping, default: 5m)
-buff <- 5
+#FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300L1/"
+FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300MXDual/"
+#FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300H20T/"   
+#FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_WingtraAltum/" 
+#FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_WingtraRX1RII/"
 
 #'####################################################################################################################
-# PREPARE PROCESSING ####
+# PREPARE TXT OUTPUT ####
 # Select flight name
 FlightName <- select_flightname(FlightPath)
 # Define export path
 ExportPath <- paste0(RootPath, mission, "/2_Results/0_Raster/")
+# Define current data
+current_date <- get_current_date()
 #'-----------------------------------------------------------------------------------------------------#
 # Define output .txt file to save console log                                                          #
 outputTXTfile <- paste0(ExportPath, FlightName, "_console_output_processing_", current_date, ".txt")   #
@@ -56,6 +61,10 @@ user_decision_overwrite_file <- userPromt_outputTXTfile(outputTXTfile)          
 # Open a connection to the text file                                                                   #
 sink(outputTXTfile, append = !user_decision_overwrite_file)                                            #
 #'-----------------------------------------------------------------------------------------------------#
+# Print executing codes                                 #
+readLines(sub("_FUNCTIONS", "", SourcePath))            #
+readLines(SourcePath)                                   #
+cat("Console output: \n")                               #
 # Print current date & time at start of processing      #
 print(paste0("Current date: ", get_current_date()))     #
 print(paste0("Current time: ", get_current_time()))     #
@@ -68,60 +77,69 @@ cat("SourcePath:", SourcePath, "\n")
 cat("RootPath:", RootPath, "\n")
 cat("mission:", mission, "\n")
 cat("FlightPath:", FlightPath, "\n")
-cat("Buffer (in m):", buff, "\n")
 
 #'####################################################################################################################
 # IMPORT FILES ####
 # Load Vector Files
-AOI_wgs <- st_read(paste0(RootPath,"0_BaseInfo/gpkg/beta4_aois.gpkg")) %>% st_zm()
-Patches_wgs <- st_read(paste0(RootPath,"0_BaseInfo/gpkg/beta4_plots.gpkg"))
+AOI <- st_read(paste0(RootPath,"0_BaseInfo/gpkg/beta4_aois.gpkg")) %>% st_zm()
+Patches <- st_read(paste0(RootPath,"0_BaseInfo/gpkg/beta4_plots.gpkg"))
 # Select required vector for AOI     -> Carefull! More aois per mission for Lübeck, Saarland and Passau!!
-aoi_name <- strsplit(mission, "_")[[1]][2]
-aoi_wgs <- AOI_wgs[AOI_wgs$folder_name == aoi_name, ]
-# Load Raster Files
-## L1 (Lidar) ####
-r_l1 <- import_dem_l1(FlightPath, FlightName)
-plot(r_l1, main = "DEM (L1)")
+(aoi_name <- strsplit(mission, "_")[[1]][2])
+aoi_wgs <- AOI[AOI$folder_name == aoi_name, ]
+# Load Raw Output
+(raw_output <- import_raw_output(FlightPath, FlightName))
+# Put files in list according to file type
+if (any(grepl("pointcloud", names(raw_output)))) {     # if (endsWith(FlightName, "DJIM300L1")) {
+  raster_list <- raw_output[1]
+  lidar_list <- raw_output[2]
+} else {
+  raster_list <- raw_output
+}
+# Trim raster (remove NAs)
+raster_list <- lapply(raster_list, trim_raster)
+# # Plot raster
+# invisible(lapply(raster_list, function(r) suppressMessages(suppressWarnings(plot_raster(r)))))    # this suppresses warnings, other than simple lapply(raster_list, plot_raster)
 
 #'####################################################################################################################
 # PROCESS FILES ####
+# Check raster validity and get specific raster information
+raster_info <- lapply(raster_list, check_raster_validity_info)
+# Check if rasters have UTM projection, optionally get correct UTM EPSG code and reproject rasters
+if (raster_info[[1]]$epsg == 4326){
+  utm_raster_list <- project_raster_list(raster_list)
+  raster_info <- lapply(utm_raster_list, check_raster_validity_info)
+} else {
+  utm_raster_list <- raster_list
+}
+# Transform AOI: WGS to UTM
+aoi_utm <- st_transform(aoi_wgs, get_utm_epsg(raster_list[[1]]))
+# Apply appropriate buffer to aoi (-> to avoid edge effects in statistical analyses: consider pixel resolution, if not exceeding raster extent ideally use factor 10, or 5. Otherwise no buffer.)
+aoiBuff <- apply_buffer_check_to_list(aoi_utm, utm_raster_list)
+# Clip (and mask) raster with corresponding buffered aoi
+clipped_rasters_buff <- clip_rasters_with_aoi_list(utm_raster_list, aoiBuff)
+# # Plot raster
+# invisible(lapply(clipped_rasters_buff, function(r) suppressMessages(suppressWarnings(plot_raster(r)))))
 
-# Check raster validity
-validity_results <- check_raster_validity(r_l1)
-# Transform vector to raster CRS
-#aoi <- transform_sf_to_raster_crs(aoi_wgs, r_l1) # -> Function exists, but is commented out. Perform steps below.
-r_epsg <- as.numeric(crs(r_l1, describe=T)$code)
-r_extent <- ext(r_l1)
-aoi <- st_transform(aoi_wgs, r_epsg)
-plot(aoi$geom, add=T)
-# Clip raster to to aoi
-r_l1_clip_aoi <- crop(r_l1, aoi)
-plot(r_l1_clip_aoi, main = paste0("DEM (L1) - clipped to aoi"))
-plot(aoi$geom, add=T)
-
-# # Apply buffer to aoi?
-# aoiBuff <- st_buffer(aoi, buff)
-# plot(aoiBuff$geom, add=T)
-# # Clip raster to to aoi
-# r_l1_clip_aoiBuff <- crop(r_l1, aoiBuff)
-# plot(r_l1_clip_aoiBuff, main = paste0("DEM (L1) - clipped to ", buff, "m buffer around aoi"))
-# plot(aoi$geom, add=T)
-# plot(aoiBuff$geom, add=T)
+#' #'####################################################################################################################
+#' # PLOT RESULTS ####
+#' plot(utm_raster_list$dem, main = "DEM")
+#' plot(aoi_utm$geom, add=T)
 
 #'####################################################################################################################
 # EXPORT FILES ####
-# Get resolution info of raster
-(resolution_info <- get_resolution_info(r_l1))
-# Rename bands
-(current_bandname <- names(r_l1_clip_aoi))
-(new_bandname <- paste0(FlightName, "_dem_res", resolution_info$res_exp, "m"))
-names(r_l1_clip_aoi) <- new_bandname
-# Define file path for export raster
-ExportRasterPath <- paste0(ExportPath, FlightName, "_dem_res", resolution_info$res_exp, "m_", current_date, ".tif")
-# Export raster
-export_raster(r_l1_clip_aoi, ExportRasterPath)
+# Print current band names
+cat("Current band names: \n")
+lapply(clipped_rasters_buff, names)
+# Rename bands to FlightName + bands + resolution
+clipped_rasters_buff_renamed <- rename_bands(FlightName, clipped_rasters_buff, raster_info)
+# Print new band names
+cat("New band names: \n")
+lapply(clipped_rasters_buff_renamed, names)
 
+# Export the rasters
+export_rasters(clipped_rasters_buff_renamed, ExportPath, FlightName, raster_info, aoiBuff)
 
+# -> aktuell bei highest res RGB multiband werden band names noch nicht richtig exportiert !!!
 
 #'------------------------------------------------------#
 # Print current date & time at start of processing      #
@@ -134,19 +152,5 @@ sink()                                                                          
 #cat(readLines(outputTXTfile), sep = "\n")                                                             #
 #'-----------------------------------------------------------------------------------------------------#
 
-
-
-
-
-
-## MXDual (Multispectral 10b) ####
-
-
-## H20T (Thermal) ####
-
-
-## Altum (Multispectral 6b) ####
-
-
-## RX1RII (RGB) ####
-
+#'####################################################################################################################
+# END
