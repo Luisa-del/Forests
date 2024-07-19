@@ -58,7 +58,7 @@ current_date <- get_current_date()
 ReportPath <- paste0(ExportPath, "2_Reports/")                                                                      #
 if (!dir.exists(ReportPath)) {dir.create(ReportPath, recursive = TRUE)}                                             #
 # Define output .txt file to save console log                                                                       #
-outputTXTfile <- paste0(ReportPath, FlightName, "_console_output_processing_", current_date, ".txt")                #
+outputTXTfile <- paste0(ReportPath, FlightName, "_base_product_output_", current_date, ".txt")                #
 # Check if file exists and decide: overwrite or append                                                              # 
 user_decision_overwrite_file <- userPromt_outputTXTfile(outputTXTfile)                                              #
 # Open a connection to the text file                                                                                #
