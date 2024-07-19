@@ -28,7 +28,7 @@ options(scipen = 100, digits = 4) # avoid numbers with e
 #'####################################################################################################################
 # SET CUSTOM PARAMETER ####
 # USER: Set path to the corresponding function script
-SourcePath <- "C:/Users/lup42bs/Documents/Projects/Forests/Scripts/R/Generate_Layer_Products_Base_FUNCTIONS.R"
+SourcePath <- "C:/Users/lup42bs/Documents/Projects/Forests/Scripts/R/Generate_Base_Products_FUNCTIONS.R"
 source(SourcePath)
 # USER: Set path to root folder (where missions are stored)
 RootPath <- "F:/ForestSinglePlots/"
