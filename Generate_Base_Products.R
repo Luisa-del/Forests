@@ -1,8 +1,8 @@
 #'####################################################################################################################
-# Generate layer products for German Forests project
+# Generate layer base products for German Forests project
 # 01.07.2024
 # Luisa Pflumm
-# Example area: BayWaldAOI1
+# Example area: BayWaldAOI8
 
 # Load libraries
 pacman::p_load(exifr, dplyr, leaflet,RColorBrewer, sf, parallel, viridis, zip, terra, lidR)
@@ -40,27 +40,30 @@ mission <- "20230823_BayWaldAOI8"
 (list_mission_flightpaths <- list_mission_flight_paths(RootPath, mission))
 # USER: Select path to flight folder
 #FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300L1/"
-FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300MXDual/"
+#FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300MXDual/"
 #FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300H20T/"   
 #FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_WingtraAltum/" 
-#FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_WingtraRX1RII/"
+FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_WingtraRX1RII/"
 
 #'####################################################################################################################
 # PREPARE TXT OUTPUT ####
 # Select flight name
 FlightName <- select_flightname(FlightPath)
 # Define export path
-ExportPath <- paste0(RootPath, mission, "/2_Results/0_Raster/")
+ExportPath <- paste0(RootPath, mission, "/2_Results/")
 # Define current data
 current_date <- get_current_date()
-#'-----------------------------------------------------------------------------------------------------#
-# Define output .txt file to save console log                                                          #
-outputTXTfile <- paste0(ExportPath, FlightName, "_console_output_processing_", current_date, ".txt")   #
-# Check if file exists and decide: overwrite or append                                                 # 
-user_decision_overwrite_file <- userPromt_outputTXTfile(outputTXTfile)                                 #
-# Open a connection to the text file                                                                   #
-sink(outputTXTfile, append = !user_decision_overwrite_file)                                            #
-#'-----------------------------------------------------------------------------------------------------#
+#'------------------------------------------------------------------------------------------------------------------#
+# Create 2_Reports folder for txt output                                                                            #
+ReportPath <- paste0(ExportPath, "2_Reports/")                                                                      #
+if (!dir.exists(ReportPath)) {dir.create(ReportPath, recursive = TRUE)}                                             #
+# Define output .txt file to save console log                                                                       #
+outputTXTfile <- paste0(ReportPath, FlightName, "_console_output_processing_", current_date, ".txt")                #
+# Check if file exists and decide: overwrite or append                                                              # 
+user_decision_overwrite_file <- userPromt_outputTXTfile(outputTXTfile)                                              #
+# Open a connection to the text file                                                                                #
+sink(outputTXTfile, append = !user_decision_overwrite_file)                                                         #
+#'------------------------------------------------------------------------------------------------------------------#
 # Print executing codes                                 #
 readLines(sub("_FUNCTIONS", "", SourcePath))            #
 readLines(SourcePath)                                   #
@@ -91,7 +94,7 @@ aoi_wgs <- AOI[AOI$folder_name == aoi_name, ]
 # Put files in list according to file type
 if (any(grepl("pointcloud", names(raw_output)))) {     # if (endsWith(FlightName, "DJIM300L1")) {
   raster_list <- raw_output[1]
-  lidar_list <- raw_output[2]
+  pointcloud <- raw_output[[2]]
 } else {
   raster_list <- raw_output
 }
@@ -117,8 +120,14 @@ aoi_utm <- st_transform(aoi_wgs, get_utm_epsg(raster_list[[1]]))
 aoiBuff <- apply_buffer_check_to_list(aoi_utm, utm_raster_list)
 # Clip (and mask) raster with corresponding buffered aoi
 clipped_rasters_buff <- clip_rasters_with_aoi_list(utm_raster_list, aoiBuff)
-# # Plot raster
-# invisible(lapply(clipped_rasters_buff, function(r) suppressMessages(suppressWarnings(plot_raster(r)))))
+# Plot raster
+#invisible(lapply(clipped_rasters_buff, function(r) suppressMessages(suppressWarnings(plot_raster(r)))))
+
+# Clip point cloud with corresponding buffered aoi and aoi
+if (any(grepl("pointcloud", names(raw_output)))) {
+  pointcloud_list <- list(clipped_pc_buff = clip_roi(pointcloud, aoiBuff[[1]][[1]]),
+                          clipped_pc = clip_roi(clipped_pc_buff, aoi_utm))
+}
 
 #' #'####################################################################################################################
 #' # PLOT RESULTS ####
@@ -140,6 +149,11 @@ lapply(clipped_rasters_buff_renamed, names)
 export_rasters(clipped_rasters_buff_renamed, ExportPath, FlightName, raster_info, aoiBuff)
 
 # -> aktuell bei highest res RGB multiband werden band names noch nicht richtig exportiert !!!
+
+# Export point clouds
+if (any(grepl("pointcloud", names(raw_output)))) {
+  export_pointcloud(pointcloud_list, ExportPath, FlightName, aoiBuff)
+}
 
 #'------------------------------------------------------#
 # Print current date & time at start of processing      #
