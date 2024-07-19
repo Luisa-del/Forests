@@ -1,5 +1,5 @@
 #'####################################################################################################################
-# FUNCTIONS to generate layer products for German Forests project
+# FUNCTIONS to generate base products for German Forests project
 # 01.07.2024
 # Luisa Pflumm
 #'####################################################################################################################
