@@ -548,7 +548,7 @@ rename_bands <- function(FlightName, raster_list, raster_info){
 # Function to generate export filename for buffered raster
 generate_export_buff_path <- function(ExportPath, FlightName, type, resolution_x, buffer_x) {
   current_date <- format(Sys.Date(), "%Y%m%d")
-  ExportPathBuff <- paste0(ExportPath, "bufferedRaster/")
+  ExportPathBuff <- paste0(ExportPath, "0_Raster/bufferedRaster/")
   if (!dir.exists(ExportPathBuff)) {
     dir.create(ExportPathBuff, recursive = TRUE)
   }
@@ -558,10 +558,10 @@ generate_export_buff_path <- function(ExportPath, FlightName, type, resolution_x
 
 
 
-# Function to generate export filename
+# Function to generate export filename for raster
 generate_export_path <- function(ExportPath, FlightName, type, resolution_x) {
   current_date <- format(Sys.Date(), "%Y%m%d")
-  export_name <- paste0(ExportPath, FlightName, "_", toupper(type), "_res", resolution_x, "m_", current_date, ".tif")
+  export_name <- paste0(ExportPath, "0_Raster/", FlightName, "_", toupper(type), "_res", resolution_x, "m_", current_date, ".tif")
   return(export_name)
 }
 
@@ -605,6 +605,47 @@ export_rasters <- function(clipped_rasters_buff_list, ExportPath, FlightName, ra
 }
 
 
+
+# Function to generate export filename for buffered LAS file
+generate_export_buff_path_las <- function(ExportPath, FlightName, buffer_x) {
+  current_date <- format(Sys.Date(), "%Y%m%d")
+  ExportPathBuff <- paste0(ExportPath, "1_PointClouds/bufferedPC/")
+  if (!dir.exists(ExportPathBuff)) {
+    dir.create(ExportPathBuff, recursive = TRUE)
+  }
+  export_buff_name <- paste0(ExportPathBuff, FlightName, "_PC_buff", buffer_x, "m_", current_date, ".las")
+  return(export_buff_name)
+}
+
+
+
+# Function to generate export filename for LAS file
+generate_export_path_las <- function(ExportPath, FlightName) {
+  current_date <- format(Sys.Date(), "%Y%m%d")
+  export_name <- paste0(ExportPath, "1_PointClouds/", FlightName, "_PC_" , current_date, ".las")
+  return(export_name)
+}
+
+
+
+# Function to export pointcloud as LAS with a generated name
+export_pointcloud <- function(pointcloud_list, ExportPath, FlightName, aoiBuff) {
+  # Export buffered point cloud
+  pc_buff <- pointcloud_list[[1]]
+  pc <- pointcloud_list[[2]]
+  
+  buffer <- aoiBuff[[1]][[2]]
+  buffer_x <- round_and_format(buffer)  # Assuming `round_and_format` is similar to `round`
+  
+  export_path_buff <- generate_export_buff_path_las(ExportPath, FlightName, buffer_x)
+  export_path <- generate_export_path_las(ExportPath, FlightName)
+  
+  writeLAS(pc_buff, export_path_buff)
+  cat("Point cloud exported:", export_path_buff, "\n")
+  
+  writeLAS(pc, export_path)
+  cat("Point cloud exported:", export_path, "\n")
+}
 
 
 #'####################################################################################################################
