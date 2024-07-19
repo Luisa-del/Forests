@@ -1,5 +1,5 @@
 #'####################################################################################################################
-# Generate layer base products for German Forests project
+# Generate base products for German Forests project
 # 01.07.2024
 # Luisa Pflumm
 # Example area: BayWaldAOI8
