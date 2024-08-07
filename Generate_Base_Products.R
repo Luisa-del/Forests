@@ -58,7 +58,7 @@ current_date <- get_current_date()
 ReportPath <- paste0(ExportPath, "2_Reports/")                                                                      #
 if (!dir.exists(ReportPath)) {dir.create(ReportPath, recursive = TRUE)}                                             #
 # Define output .txt file to save console log                                                                       #
-outputTXTfile <- paste0(ReportPath, FlightName, "_base_product_output_", current_date, ".txt")                #
+outputTXTfile <- paste0(ReportPath, FlightName, "_base_product_output_", current_date, ".txt")                      #
 # Check if file exists and decide: overwrite or append                                                              # 
 user_decision_overwrite_file <- userPromt_outputTXTfile(outputTXTfile)                                              #
 # Open a connection to the text file                                                                                #
@@ -144,12 +144,8 @@ clipped_rasters_buff_renamed <- rename_bands(FlightName, clipped_rasters_buff, r
 # Print new band names
 cat("New band names: \n")
 lapply(clipped_rasters_buff_renamed, names)
-
 # Export the rasters
 export_rasters(clipped_rasters_buff_renamed, ExportPath, FlightName, raster_info, aoiBuff)
-
-# -> aktuell bei highest res RGB multiband werden band names noch nicht richtig exportiert !!!
-
 # Export point clouds
 if (any(grepl("pointcloud", names(raw_output)))) {
   export_pointcloud(pointcloud_list, ExportPath, FlightName, aoiBuff)
