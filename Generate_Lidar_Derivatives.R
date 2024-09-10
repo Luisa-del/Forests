@@ -163,90 +163,22 @@ plot_las_with_transect(nlas, aoi_utm)  # -> PC visual. might take a while
 #' -> based on different statistical metrics based on canopy heights; based on point height above ground
 (be_h_stats <- calculate_be_h_stats(nlas))  # -> indices calc. might take a while (~3.61 mins)
 
-# 2. Calculate point statistics (BE_RD_CAN/UND/REG/GRD, BE_RD_01/02/.../maxHeight, BE_PR_CAN/UND/REG/GRD, BE_PR_01/02/.../maxHeight) 
+# 2. Calculate point statistics (BE_RD_CAN/UND/REG/GRD/_01/02/.../_maxHeight, BE_PR_CAN/UND/REG/GRD/_PR_01/02/.../_maxHeight) 
 #' Point Density (Proportion of Total Points): number_points_in_layer / total_points_in_pointcloud
 #' Point Count (Points per Unit Height):       number_points_in_layer / height_of_layer (e.g., 1 m)
 #' Penetration Rate (Pass-Through Rate):       number_points_in_layer / number_points_in_layer_and_below
 #' -> so far, all points below 0 are excluded. Clarify with others, if yes/no?!
 #' -> clarify exact outer boundaries of bins in functions, if open/closed?!
+#' -> there is a mini tiny slightly difference in point_density per meter: e.g 0-1m calculated with calculate_layer_pointStats: 0.1614687110, 0-1, sum up first ten 0.1m layer: 0.1615
 
 # Option 1: Generate stats for single 1m layer
-be_pr_rd_stats_1m_layer <- calculate_layer_pointStats(nlas, layer_height = 1)
-View(be_pr_rd_stats_1m_layer)
+be_point_stats_1m_layer <- calculate_layer_pointStats(nlas, layer_height = 1)
+View(be_point_stats_1m_layer)
 
 # Option 2:  Generate stats for broader vegetation layers -> define ground-, regeneration- and understory-layer (canopy-layer is all above understory-layer)
-be_pr_rd_stats_veg_layer <- calculate_veg_layer_pointStats(nlas, grd = 1.5, reg = 5, und = 7)
-View(be_pr_rd_stats_veg_layer$single_layer_stats)
-View(be_pr_rd_stats_veg_layer$Point_Count_per_veg_layer)
-View(be_pr_rd_stats_veg_layer$Point_Density_per_veg_layer)
-View(be_pr_rd_stats_veg_layer$Penetration_Rate_per_veg_layer)
-
-
-#  -> HIER STEHEN GEBLIEBEN!! (unten alte versuche, ggfs weg)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# Calculate penetration rates
-#extract ground points, first returns, and last returns.
-#Calculate Penetration Rates: Compute the ratio of ground points to total points for all points, first returns, and last returns.
-#'Penetration Rate All: ratio of the number of ground points (Classification == 2) to the total number of points in the LAS file; 
-#->gives an overall penetration rate, considering all points in the dataset.
-#'Penetration Rate First: ratio of the number of ground points that are also first returns (Classification == 2 & ReturnNumber == 1) to the total number of first returns (ReturnNumber == 1); 
-#-> represents the penetration rate of ground points specifically among the first returns, which often correspond to the highest surface (e.g., canopy top).
-#'Penetration Rate Last: ratio of the number of ground points that are also last returns (Classification == 2 & ReturnNumber == las_data$NumberOfReturns) to the total number of last returns;
-#-> last returns are typically closer to the ground, so this rate gives insight into how many of the last returns are actually classified as ground points.
-
-penetration_rates <- calculate_penetration_rates(nlas)
-print(penetration_rates * 100)
-penetration_rates_veg <- calculate_vegetation_penetration_rates(nlas)
-print(penetration_rates_veg * 100)
-
-# #pr <- calculate_penetration_rate(nlas, 0, 1)
-# pr2 <- calculate_penetration_rates(nlas)
-pr <- calculate_penetration_rates(nlas)
-
-
-
-
-
-
-
-
-
-
-# # Function to calculate mean top-of-canopy height (TCH)
-# calculate_tch <- function(chm_raster) {
-#   # Calculate the mean of CHM raster pixels
-#   tch_mean <- global(chm_raster, mean, na.rm = TRUE)
-#   return(tch_mean)
-# }
-# # Calculate the mean height of the CHM
-# tch <- chm_height_mean <- lapply(patches_raster_deriv$chm, calculate_tch)
-
-#//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
+be_point_stats_veg_layer <- calculate_veg_layer_pointStats(nlas, grd = 1.5, reg = 5, und = 7)
+View(be_point_stats_veg_layer$single_layer_stats)
+View(be_point_stats_veg_layer$veg_layer_stats)
 
 
 ### Patch - level -----------------------------------------------------------------------------------------------------
