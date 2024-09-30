@@ -6,6 +6,7 @@
 
 #'####################################################################################################################
 # SET CUSTOM PARAMETER ####
+
 ### Function to list mission folders and flight paths
 list_all_flight_paths <- function(root_path) {
   # List all folders in root folder
@@ -90,7 +91,7 @@ select_flightname <- function(path) {
 
 
 
-# Function to return current time
+### Function to return current time
 get_current_time <- function() {
   current_datetime <- Sys.time()
   current_time <- format(current_datetime, "%H:%M:%S")
@@ -99,21 +100,21 @@ get_current_time <- function() {
 
 
 
-# Function to return current date
+### Function to return current date
 get_current_date <- function() {
   return(Sys.Date())
 }
 
 
 
-# Function to check if file exists
+### Function to check if file exists
 file_exists <- function(file_path) {
   file.exists(file_path)
 }
 
 
 
-# Function to handle user prompt
+### Function to handle user prompt
 userPromt_outputTXTfile <- function(file_path) {
   # Check if file exists
   if (file_exists(file_path)) {
@@ -138,6 +139,8 @@ userPromt_outputTXTfile <- function(file_path) {
 
 #'####################################################################################################################
 # IMPORT FILES ####
+
+
 
 ### Function to check if raw output files are exsisting (.tif, .prj, .tfw and .las files for Lidar, .tif for all others) and import them
 import_raw_output <- function(FlightPath, FlightName) {
@@ -202,14 +205,14 @@ import_raw_output <- function(FlightPath, FlightName) {
 
 
 
-# Function to trim a raster
+### Function to trim a raster
 trim_raster <- function(raster) {
   return(trim(raster))
 }
 
 
 
-# Function to plot raster (if more than one bands plot first band)
+### Function to plot raster (if more than one bands plot first band)
 plot_raster <- function(raster) {
   if (nlyr(raster) > 1) {
     # Extract and plot the first band
@@ -230,7 +233,10 @@ plot_raster <- function(raster) {
 
 
 
-# Function to check CRS and extent validity
+#'####################################################################################################################
+# PROCESS FILES ####
+
+### Function to check CRS and extent validity
 check_raster_validity_info <- function(raster_path) {
   # Load the raster
   raster_data <- rast(raster_path)
@@ -309,7 +315,7 @@ check_raster_validity_info <- function(raster_path) {
 
 
 
-# Function to get the correct UTM EPSG code for a raster
+### Function to get the correct UTM EPSG code for a raster
 get_utm_epsg <- function(raster) {
   
   # Get the CRS of the raster
@@ -341,7 +347,7 @@ get_utm_epsg <- function(raster) {
 
 
 
-# Function to project rasters to correct UTM and return a list
+### Function to project rasters to correct UTM and return a list
 project_raster_list <- function(raster_list) {
   # Internal function to project a single raster
   project_raster <- function(raster) {
@@ -358,9 +364,9 @@ project_raster_list <- function(raster_list) {
 
 
 
-# Function to determine adequate buffer that should be applied around AOI for raster clip to avoid edge effects in statistical analyses 
+### Function to determine adequate buffer that should be applied around AOI for raster clip to avoid edge effects in statistical analyses 
 # -> the buffer should be ideally be 10 * pixel-resolution, if exceeding raster extent use factor 5. Otherwise no buffer will be applied to AOI.
-apply_buffer_check <- function(aoi, raster) {
+apply_buffer <- function(aoi, raster) {
   # Get the pixel resolution (assuming square pixels)
   res <- res(raster)
   pixel_resolution <- min(res) # Using the minimum resolution as the pixel resolution
@@ -395,16 +401,16 @@ apply_buffer_check <- function(aoi, raster) {
   }
 }
 
-# Wrapper function to apply the `apply_buffer_check`-function to a list of rasters
-apply_buffer_check_to_list <- function(aoi, raster_list) {
+### Wrapper function to apply the `apply_buffer`-function to a list of rasters
+apply_buffer_to_list <- function(aoi, raster_list) {
   lapply(raster_list, function(raster) {
-    apply_buffer_check(aoi, raster)
+    apply_buffer(aoi, raster)
   })
 }
 
 
 
-# Function to clip rasters in a list with corresponding AOIs from another list
+### Function to clip rasters in a list with corresponding AOIs from another list
 clip_rasters_with_aoi_list <- function(utm_raster_list, aoiBuff_list) {
   # Initialize the output list
   clipped_raster_buff_list <- list()
@@ -436,7 +442,7 @@ clip_rasters_with_aoi_list <- function(utm_raster_list, aoiBuff_list) {
 
 
 
-# Function to clip rasters in a list with a single AOI
+### Function to clip rasters in a list with a single AOI
 clip_rasters_with_aoi_sf <- function(utm_raster_list, aoi_utm) {
   # Initialize the output list
   clipped_raster_list <- list()
@@ -474,11 +480,11 @@ system_bands <- function(FlightName){
     bands <- list(dsm = "DSM", 
                   om = c("CBlue-444", "Blue-475", "Green-531", "Green-560", "Red-650", "Red-668", "Red-edge-705", "Red-edge-717", "Red-edge-740", "NIR-840")) # band info from https://support.micasense.com/hc/en-us/articles/214878778-What-is-the-center-wavelength-and-bandwidth-of-each-filter-for-MicaSense-sensors & https://agisoft.freshdesk.com/support/solutions/articles/31000161029-how-to-add-micasense-rededge-mx-dual-data-properly
     
-    # } else if (endsWith(FlightName, "DJIM300H20T")){
-    #   bands <- list(dsm = "DSM", 
-    #                 om = c("???"))
+    } else if (endsWith(FlightName, "DJIM300H20T")){ # om band names true??
+      bands <- list(dsm = "DSM",
+                    om = c("Blue", "Green", "Red", "IR"))
     
-  } else if (endsWith(FlightName, "WingtraAltum")){
+  } else if (endsWith(FlightName, "WingtraAltum")){ # om band names true??
     bands <- list(dsm = "DSM", 
                   om = c("Blue", "Green", "Red", "Red-edge717", "NIR", "LWIR"))
     
