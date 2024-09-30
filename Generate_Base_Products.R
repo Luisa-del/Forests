@@ -28,8 +28,8 @@ options(scipen = 100, digits = 4) # avoid numbers with e
 #'####################################################################################################################
 # SET CUSTOM PARAMETER ####
 # USER: Set path to the corresponding function script
-SourcePath <- "C:/Users/lup42bs/Documents/Projects/Forests/Scripts/R/Generate_Base_Products_FUNCTIONS.R"
-source(SourcePath)
+SourcePath1 <- "C:/Users/lup42bs/Documents/Projects/Forests/Scripts/R/Generate_Base_Products_FUNCTIONS.R"
+source(SourcePath1)
 # USER: Set path to root folder (where missions are stored)
 RootPath <- "F:/ForestSinglePlots/"
 # List all existing flight folder
@@ -42,8 +42,8 @@ mission <- "20230823_BayWaldAOI8"
 #FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300L1/"
 #FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300MXDual/"
 #FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_DJIM300H20T/"   
-#FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_WingtraAltum/" 
-FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_WingtraRX1RII/"
+FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_WingtraAltum/" 
+#FlightPath <- "F:/ForestSinglePlots/20230823_BayWaldAOI8/0_Flights/20230823_BayWaldAOI8_WingtraRX1RII/"
 
 #'####################################################################################################################
 # PREPARE TXT OUTPUT ####
@@ -65,8 +65,8 @@ user_decision_overwrite_file <- userPromt_outputTXTfile(outputTXTfile)          
 sink(outputTXTfile, append = !user_decision_overwrite_file)                                                         #
 #'------------------------------------------------------------------------------------------------------------------#
 # Print executing codes                                 #
-readLines(sub("_FUNCTIONS", "", SourcePath))            #
-readLines(SourcePath)                                   #
+readLines(sub("_FUNCTIONS", "", SourcePath1))            #
+readLines(SourcePath1)                                   #
 cat("Console output: \n")                               #
 # Print current date & time at start of processing      #
 print(paste0("Current date: ", get_current_date()))     #
@@ -76,7 +76,7 @@ print(paste0("Current time: ", get_current_time()))     #
 # # Optionally, read the file to verify the content
 # cat(readLines(outputTXTfile), sep = "\n")
 # Print all custom parameter
-cat("SourcePath:", SourcePath, "\n")
+cat("SourcePath:", SourcePath1, "\n")
 cat("RootPath:", RootPath, "\n")
 cat("mission:", mission, "\n")
 cat("FlightPath:", FlightPath, "\n")
@@ -117,7 +117,7 @@ if (raster_info[[1]]$epsg == 4326){
 # Transform AOI: WGS to UTM
 aoi_utm <- st_transform(aoi_wgs, get_utm_epsg(raster_list[[1]]))
 # Apply appropriate buffer to aoi (-> to avoid edge effects in statistical analyses: consider pixel resolution, if not exceeding raster extent ideally use factor 10, or 5. Otherwise no buffer.)
-aoiBuff <- apply_buffer_check_to_list(aoi_utm, utm_raster_list)
+aoiBuff <- apply_buffer_to_list(aoi_utm, utm_raster_list)
 # Clip (and mask) raster with corresponding buffered aoi
 clipped_rasters_buff <- clip_rasters_with_aoi_list(utm_raster_list, aoiBuff)
 # Plot raster
@@ -136,6 +136,15 @@ if (any(grepl("pointcloud", names(raw_output)))) {
 
 #'####################################################################################################################
 # EXPORT FILES ####
+#'####################################################################################################################
+#' System           || Orthomosaic band names
+#' ---------------- || ---------------------------------------------------------------------------
+#' DJIM300L1        ||  -
+#' DJIM300MXDual    || 10 bands: "CBlue-444", "Blue-475", "Green-531", "Green-560", "Red-650", "Red-668", "Red-edge-705", "Red-edge-717", "Red-edge-740", "NIR-840"
+#' DJIM300H20T      ||  4 bands: "Blue", "Green", "Red", "IR"
+#' WingtraAltum     ||  6 bands: "Blue", "Green", "Red", "Red-edge717", "NIR", "LWIR"
+#' WingtraRX1RII    ||  3 bands: "Blue", "Green", "Red"
+
 # Print current band names
 cat("Current band names: \n")
 lapply(clipped_rasters_buff, names)
