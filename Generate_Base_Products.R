@@ -125,8 +125,12 @@ clipped_rasters_buff <- clip_rasters_with_aoi_list(utm_raster_list, aoiBuff)
 
 # Clip point cloud with corresponding buffered aoi and aoi
 if (any(grepl("pointcloud", names(raw_output)))) {
-  pointcloud_list <- list(clipped_pc_buff = clip_roi(pointcloud, aoiBuff[[1]][[1]]),
-                          clipped_pc = clip_roi(clipped_pc_buff, aoi_utm))
+  # pointcloud_list <- list(clipped_pc_buff = clip_roi(pointcloud, aoiBuff[[1]][[1]]),
+  #                         clipped_pc = clip_roi(clipped_pc_buff, aoi_utm))
+  clipped_pc_buff = clip_roi(pointcloud, aoiBuff[[1]][[1]])
+  clipped_pc = clip_roi(clipped_pc_buff, aoi_utm)
+  pointcloud_list <- list(clipped_pc_buff, clipped_pc)
+  names(pointcloud_list) <- c("clipped_pc_buff", "clipped_pc")
 }
 
 #' #'####################################################################################################################
