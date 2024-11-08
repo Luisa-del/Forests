@@ -4,23 +4,60 @@
 # Luisa Pflumm
 #'####################################################################################################################
 
+#'####################################################################################################################
+# # SET CUSTOM PARAMETER ####
 
-
-### Function to check if file exists
-file_exists <- function(file_path) {
-  file.exists(file_path)
-}
+# -> All applied functions stored in : SourcePath1 <- "C:/Users/lup42bs/Documents/Projects/Forests/Scripts/R/Generate_Base_Products_FUNCTIONS.R"
 
 
 
+#'####################################################################################################################
+# # IMPORT FILES ####
+
+# ### Function to check if DJIM300L1 base products are exsisting and import them
+# import_base_products_l1_buff <- function(RootPath, mission, FlightName) {
+#   if (endsWith(FlightName, "DJIM300L1")) {
+#     # Construct the full paths
+#     raster_path <- paste0(RootPath, mission, "/2_Results/0_Raster/bufferedRaster/")
+#     las_path <- paste0(RootPath, mission, "/2_Results/1_PointClouds/bufferedPC/")
+#    
+#     # List all files in the directories without full path names
+#     tif_file <- list.files(raster_path, pattern = "\\.tif$", full.names = TRUE)
+#     las_file <- list.files(las_path, pattern = "\\.las$", full.names = TRUE)
+#     
+#     # Use grepl to filter files containing the flightname
+#     tif_file <- tif_file[grepl(FlightName, tif_file)]
+#     las_file <- las_file[grepl(FlightName, las_file)]
+#     
+#     # Check if the .tif and .las files exists
+#     if (!file.exists(tif_file)) {
+#       stop(paste("No DJIM300L1 DEM was found in", raster_path, "folder"))
+#     }
+#     
+#     if (!file.exists(las_file)) {
+#       stop(paste("No DJIM300L1 Point Cloud was found in", las_path, "folder"))
+#     }
+#     
+#     # Load the .tif file
+#     raster_data <- rast(tif_file)
+#     
+#     # Load the .las file
+#     lidar_data <- readLAS(las_file)
+#     
+#     # Return the l1 base products in list
+#     return(list(dem = raster_data, pointcloud = lidar_data))
+#     } else {
+#       print("Base products could not be found in folder. Check if they already were generated.")
+#   }
+# }
 ### Function to check if DJIM300L1 base products are exsisting and import them
 import_base_products_l1_buff <- function(RootPath, mission, FlightName) {
   if (endsWith(FlightName, "DJIM300L1")) {
     # Construct the full paths
     raster_path <- paste0(RootPath, mission, "/2_Results/0_Raster/bufferedRaster/")
     las_path <- paste0(RootPath, mission, "/2_Results/1_PointClouds/bufferedPC/")
-   
-    # List all files in the directories without full path names
+    
+    # List all files in the directories with full path names
     tif_file <- list.files(raster_path, pattern = "\\.tif$", full.names = TRUE)
     las_file <- list.files(las_path, pattern = "\\.las$", full.names = TRUE)
     
@@ -28,25 +65,30 @@ import_base_products_l1_buff <- function(RootPath, mission, FlightName) {
     tif_file <- tif_file[grepl(FlightName, tif_file)]
     las_file <- las_file[grepl(FlightName, las_file)]
     
-    # Check if the .tif and .las files exists
-    if (!file.exists(tif_file)) {
-      stop(paste("No DJIM300L1 DEM was found in", raster_path, "folder"))
-    }
+    # Initialize variables for DEM and LAS
+    raster_data <- NULL
+    lidar_data <- NULL
     
-    if (!file.exists(las_file)) {
-      stop(paste("No DJIM300L1 Point Cloud was found in", las_path, "folder"))
-    }
-    
-    # Load the .tif file
-    raster_data <- rast(tif_file)
-    
-    # Load the .las file
-    lidar_data <- readLAS(las_file)
-    
-    # Return the l1 base products in list
-    return(list(dem = raster_data, pointcloud = lidar_data))
+    # Check if the .tif file exists
+    if (length(tif_file) == 0 || !file.exists(tif_file)) {
+      warning(paste("No DJIM300L1 DEM was found in", raster_path, "folder. Returning only the LAS file."))
     } else {
-      print("Base products could not be found in folder. Check if they already were generated.")
+      # Load the .tif file
+      raster_data <- rast(tif_file)
+    }
+    
+    # Check if the .las file exists
+    if (length(las_file) == 0 || !file.exists(las_file)) {
+      stop(paste("No DJIM300L1 Point Cloud was found in", las_path, "folder"))
+    } else {
+      # Load the .las file
+      lidar_data <- readLAS(las_file)
+    }
+    
+    # Return both DEM and LAS, with DEM being NULL if not found
+    return(list(dem = raster_data, pointcloud = lidar_data))
+  } else {
+    print("Base products could not be found in folder. Check if they already were generated.")
   }
 }
 
@@ -118,81 +160,108 @@ plot_list_output <- function(data_list, n_cols) {
 
 
 
+#'####################################################################################################################
+# # PROCESS FILES ####
+
+# ### Function to calculate different Canopy Height Models / Digital Surface Models
+# calculate_topALSreturns_all <- function(nlas, model, resolution) {
+#   # Convert model to uppercase
+#   model <- toupper(model)
+#   
+#   # Check if y is not "CHM" or "DSM"
+#   if (model != "CHM" && model != "DSM") {
+#     stop("Please specify 'CHM' or 'DSM'.")
+#   }
+#   
+#   # Point-to-raster methods
+#   mod_ptr_1 <- rasterize_canopy(nlas, res = resolution, p2r())
+#   mod_ptr_2 <- rasterize_canopy(nlas, res = resolution, algorithm = p2r(subcircle = 0.15))
+#   mod_ptr_3 <- rasterize_canopy(nlas, res = resolution, algorithm = p2r(0.2, na.fill = tin()))
+#   
+#   # Post-processing a point-to-raster CHM or DSM model
+#   fill.na <- function(x, i = 5) { if (is.na(x)[i]) { return(mean(x, na.rm = TRUE)) } else { return(x[i]) } }
+#   w <- matrix(1, 3, 3)
+#   
+#   filled1 <- terra::focal(mod_ptr_1, w, fun = fill.na)
+#   filled2 <- terra::focal(mod_ptr_2, w, fun = fill.na)
+#   filled3 <- terra::focal(mod_ptr_3, w, fun = fill.na)
+#   
+#   smoothed1 <- terra::focal(mod_ptr_1, w, fun = mean, na.rm = TRUE)
+#   smoothed2 <- terra::focal(mod_ptr_2, w, fun = mean, na.rm = TRUE)
+#   smoothed3 <- terra::focal(mod_ptr_3, w, fun = mean, na.rm = TRUE)
+#   
+#   mods_ptr_1 <- c(mod_ptr_1, filled1, smoothed1)
+#   mods_ptr_2 <- c(mod_ptr_2, filled2, smoothed2)
+#   mods_ptr_3 <- c(mod_ptr_3, filled3, smoothed3)
+#   
+#   names(mods_ptr_1) <- c("Z_Base", "Z_Filled", "Z_Smoothed")
+#   names(mods_ptr_2) <- c("Z_Base", "Z_Filled", "Z_Smoothed")
+#   names(mods_ptr_3) <- c("Z_Base", "Z_Filled", "Z_Smoothed")
+#   
+#   # Triangulation methods
+#   mod_tri_1 <- rasterize_canopy(nlas, res = resolution, algorithm = dsmtin())
+#   mod_tri_2 <- rasterize_canopy(nlas, res = resolution, algorithm = dsmtin(max_edge = 8))
+#   
+#   # Store all CHM or DSM objects in a list
+#   mod_list <- list(
+#     mod_ptr_1 = mods_ptr_1,
+#     mod_ptr_2 = mods_ptr_2,
+#     mod_ptr_3 = mods_ptr_3,
+#     mod_tri_1 = mod_tri_1,
+#     mod_tri_2 = mod_tri_2
+#   )
+#   
+#   # Rename the list elements
+#   mod <- tolower(model)
+#   names(mod_list) <- c(
+#     paste0(mod, "_ptr_1"),
+#     paste0(mod, "_ptr_2"),
+#     paste0(mod, "_ptr_3"),
+#     paste0(mod, "_tri_1"),
+#     paste0(mod, "_tri_2")
+#   )
+#   
+#   # Plot all CHM or DSM objects
+#   plot(mod_ptr_1, col = height.colors(25), main = paste0(model, " (ptr) v1"))
+#   plot(mod_ptr_2, col = height.colors(25), main = paste0(model, " (ptr) v2"))
+#   plot(mod_ptr_3, col = height.colors(25), main = paste0(model, " (ptr) v3"))
+#   
+#   plot(mods_ptr_1, col = height.colors(25))
+#   title(main = paste0(model, " (ptr) v1"),, outer=TRUE, line=-2)
+#   plot(mods_ptr_2, col = height.colors(25))
+#   title(main = paste0(model, " (ptr) v2"), outer=TRUE, line=-2)
+#   plot(mods_ptr_3, col = height.colors(25))
+#   title(main = paste0(model, " (ptr) v3"), outer=TRUE, line=-2)
+#   
+#   plot(mod_tri_1, col = height.colors(25), main = paste0(model, " (tri) v1"))
+#   plot(mod_tri_2, col = height.colors(25), main = paste0(model, " (tri) v2"))
+#   
+#   return(mod_list)
+# }
+
 ### Function to calculate different Canopy Height Models / Digital Surface Models
 calculate_topALSreturns <- function(nlas, model, resolution) {
   # Convert model to uppercase
   model <- toupper(model)
-  
+
   # Check if y is not "CHM" or "DSM"
   if (model != "CHM" && model != "DSM") {
     stop("Please specify 'CHM' or 'DSM'.")
   }
-  
-  # Point-to-raster methods
-  mod_ptr_1 <- rasterize_canopy(nlas, res = resolution, p2r())
-  mod_ptr_2 <- rasterize_canopy(nlas, res = resolution, algorithm = p2r(subcircle = 0.15))
-  mod_ptr_3 <- rasterize_canopy(nlas, res = resolution, algorithm = p2r(0.2, na.fill = tin()))
-  
-  # Post-processing a point-to-raster CHM or DSM model
-  fill.na <- function(x, i = 5) { if (is.na(x)[i]) { return(mean(x, na.rm = TRUE)) } else { return(x[i]) } }
-  w <- matrix(1, 3, 3)
-  
-  filled1 <- terra::focal(mod_ptr_1, w, fun = fill.na)
-  filled2 <- terra::focal(mod_ptr_2, w, fun = fill.na)
-  filled3 <- terra::focal(mod_ptr_3, w, fun = fill.na)
-  
-  smoothed1 <- terra::focal(mod_ptr_1, w, fun = mean, na.rm = TRUE)
-  smoothed2 <- terra::focal(mod_ptr_2, w, fun = mean, na.rm = TRUE)
-  smoothed3 <- terra::focal(mod_ptr_3, w, fun = mean, na.rm = TRUE)
-  
-  mods_ptr_1 <- c(mod_ptr_1, filled1, smoothed1)
-  mods_ptr_2 <- c(mod_ptr_2, filled2, smoothed2)
-  mods_ptr_3 <- c(mod_ptr_3, filled3, smoothed3)
-  
-  names(mods_ptr_1) <- c("Z_Base", "Z_Filled", "Z_Smoothed")
-  names(mods_ptr_2) <- c("Z_Base", "Z_Filled", "Z_Smoothed")
-  names(mods_ptr_3) <- c("Z_Base", "Z_Filled", "Z_Smoothed")
-  
+
   # Triangulation methods
-  mod_tri_1 <- rasterize_canopy(nlas, res = resolution, algorithm = dsmtin())
   mod_tri_2 <- rasterize_canopy(nlas, res = resolution, algorithm = dsmtin(max_edge = 8))
-  
-  # Store all CHM or DSM objects in a list
-  mod_list <- list(
-    mod_ptr_1 = mods_ptr_1,
-    mod_ptr_2 = mods_ptr_2,
-    mod_ptr_3 = mods_ptr_3,
-    mod_tri_1 = mod_tri_1,
-    mod_tri_2 = mod_tri_2
-  )
-  
+
   # Rename the list elements
   mod <- tolower(model)
-  names(mod_list) <- c(
-    paste0(mod, "_ptr_1"),
-    paste0(mod, "_ptr_2"),
-    paste0(mod, "_ptr_3"),
-    paste0(mod, "_tri_1"),
-    paste0(mod, "_tri_2")
-  )
-  
+  print(paste0("Calculating ", mod, " (triangulation-based method)"))
+
   # Plot all CHM or DSM objects
-  plot(mod_ptr_1, col = height.colors(25), main = paste0(model, " (ptr) v1"))
-  plot(mod_ptr_2, col = height.colors(25), main = paste0(model, " (ptr) v2"))
-  plot(mod_ptr_3, col = height.colors(25), main = paste0(model, " (ptr) v3"))
-  
-  plot(mods_ptr_1, col = height.colors(25))
-  title(main = paste0(model, " (ptr) v1"),, outer=TRUE, line=-2)
-  plot(mods_ptr_2, col = height.colors(25))
-  title(main = paste0(model, " (ptr) v2"), outer=TRUE, line=-2)
-  plot(mods_ptr_3, col = height.colors(25))
-  title(main = paste0(model, " (ptr) v3"), outer=TRUE, line=-2)
-  
-  plot(mod_tri_1, col = height.colors(25), main = paste0(model, " (tri) v1"))
-  plot(mod_tri_2, col = height.colors(25), main = paste0(model, " (tri) v2"))
-  
-  return(mod_list)
+  plot(mod_tri_2, col = height.colors(25), main = model)
+
+  return(mod_tri_2)
 }
+
 
 
 
@@ -260,7 +329,7 @@ calculate_global_stats <- function(raster_list) {
     
     # Loop through each statistic function and calculate it
     for (stat_name in names(stat_functions)) {
-      stat_value <- global(raster, stat_functions[[stat_name]], na.rm = TRUE)
+      stat_value <- terra::global(raster, stat_functions[[stat_name]], na.rm = TRUE)
       
       # Round the statistic value
       stats[stat_name] <- round(stat_value, 3)
@@ -282,6 +351,52 @@ calculate_global_stats <- function(raster_list) {
 
 
 
+### Function to calculate mean top-of-canopy height (TCH)    -> tch == chm_height_mean
+calculate_tch <- function(chm_raster) {
+  # Calculate the mean of CHM raster pixels
+  #tch_mean <- cellStats(chm_raster, mean, na.rm = TRUE)  # raster::raster()
+  tch_mean <- terra::global(chm_raster, "mean", na.rm = TRUE)        # terra::rast()
+  return(tch_mean)
+}
+
+### Function to calculate AGB carbon based on TCH
+calculate_agb_carbon <- function(tch) {
+  # Use the formula from Stephan Getzin et al.
+  agb_carbon <- 6.85 * tch^0.952
+  return(agb_carbon)
+}
+
+### Function to calculate AGB based on AGB carbon
+calculate_agb <- function(agb_carbon) {
+  # Convert AGB carbon to AGB
+  agb <- agb_carbon / 0.48
+  return(agb)
+}
+
+### Function to calculate global statistics (summarize values) for list of raster
+calculate_agb_stats <- function(raster) {
+  
+  # Extract mean top-of-canopy height (TCH)
+  tch <- calculate_tch(raster)
+  
+  # Calculate AGB carbon (typically represents mass of carbon in the aboveground biomass, often measured in kilograms of carbon per square meter (kg C/m²) or megagrams of carbon per hectare (Mg C/ha))
+  agb_carb <- calculate_agb_carbon(tch)
+  
+  # Calculate AGB (typically represents the total mass of the aboveground portion of the vegetation, often measured in kilograms per square meter (kg/m²) or megagrams per hectare (Mg/ha))
+  agb <- calculate_agb(agb_carb)
+  
+  # Create df
+  agb_df <- data.frame(tch = tch,
+                       agb_carb = agb_carb,
+                       agb = agb)
+  
+  colnames(agb_df) <- c("tch", "agb_carb", "agb")
+  
+  return(agb_df)
+}
+
+
+
 ### Function to create the ggplot to visualise AOI & Patches
 plot_aois <- function(aoi_utm, patches_utm) {
   plot <- ggplot() +
@@ -293,6 +408,7 @@ plot_aois <- function(aoi_utm, patches_utm) {
   # Print the plot
   print(plot)
 }
+
 
 
 
@@ -351,25 +467,26 @@ clip_data_by_polygons <- function(list_data, polygon_sf) {
 
 
 ### Function to make 5 x 5 m grid on top of patches
-make_grids <- function(list_patches, res) {
+make_grids <- function(sf, res) {
   # Create a grid of 5x5m covering the extent of the polygon
-  grid <- st_make_grid(list_patches, cellsize = c(res, res), square = TRUE)
+  grid <- st_make_grid(sf, cellsize = c(res, res), square = TRUE)
   # Convert to sf object
   grid <- st_sf(geometry = grid)
   # Assign the Patch.Nr to each grid cell; and ensure that only grid cells within/touching the patches are kept (`left = FALSE`)
-  grid <- st_join(grid, list_patches["Patch.Nr"], left = FALSE) %>% mutate(cell.id = row_number())
-  # Clip the grid with your polygon
-  patches_grid <- st_intersection(grid, list_patches) %>% dplyr::select(Patch.Nr, cell.id) #%>% mutate(cell.id = row_number())
+  grid <- st_join(grid, sf["Patch.Nr"], left = FALSE) %>% mutate(cell.id = row_number())
+  # # Clip the grid with your polygon
+  # clipped_grid <- st_intersection(grid, sf) %>% dplyr::select(Patch.Nr, cell.id) #%>% mutate(cell.id = row_number())
   # Keep only full grid cells within the polygon
-  patches_grid_fullCell <- st_filter(grid, list_patches, .predicate = st_within)
+  clipped_grid_fullCell <- st_filter(grid, sf, .predicate = st_within)
   # Reset cell.id for each Patch.Nr
-  patches_grid_fullCell <- patches_grid_fullCell %>%
+  clipped_grid_fullCell <- clipped_grid_fullCell %>%
     group_by(Patch.Nr) %>%
     mutate(cell.id = row_number()) %>%
     ungroup()
   
   # List grid-objects
-  grid_list <- list(patches_grid = patches_grid, patches_grid_fullCell = patches_grid_fullCell)
+  grid_list <- list(patches_grid = grid, #clipped_grid, 
+                    patches_grid_fullCell = clipped_grid_fullCell)
   
   return(grid_list)
 }
@@ -380,9 +497,9 @@ make_grids <- function(list_patches, res) {
 plot_grids <- function(grid_list, aoi_utm, patches_utm) {
   plot <- ggplot() +
   geom_sf(data = aoi_utm, fill = NA, color = "black") +
-  geom_sf(data = patches_utm, fill = NA, color = "black") +
+  geom_sf(data = patches_utm, fill = NA, color = "red") +
   geom_sf(data = grid_list$patches_grid, fill = "blue", alpha = 0.5) +
-  geom_sf(data = grid_list$patches_grid_fullCell, fill = "red", alpha = 0.5) +
+  #geom_sf(data = grid_list$patches_grid_fullCell, fill = "red", alpha = 0.5) +
   geom_sf_text(data = patches_utm, aes(label = Patch.Nr), size = 3, color = "black", nudge_y = 50.5) +
   #geom_sf_text(data = patches_grid, aes(label = cell.id), size = 3, color = "black") +                          # show cell.ids
   #scale_color_manual(name = "Grid Type", values = c("Intersecting Cells" = "blue", "Full Cells" = "red")) +     # add legend -> not working yet
@@ -414,6 +531,70 @@ flatten_nested_list_to_df <- function(nested_list) {
   return(final_df)
 }
 
+
+plot_transect <- function(las_data, aoi, rast){
+  
+  # Get bbox (extent) of aoi
+  bbox <- st_bbox(aoi)
+
+  # Extract coordinates from bounding box
+  top_left <- c(x = as.numeric(bbox["xmin"]), y = as.numeric(bbox["ymax"]))  # Top-left (Northwest)
+  bottom_right <- c(x = as.numeric(bbox["xmax"]), y = as.numeric(bbox["ymin"]))  # Bottom-right (Southeast)
+  
+  # Create the data frame for transect points
+  transect_points <- data.frame(
+    X = c(top_left["x"], bottom_right["x"]),
+    Y = c(top_left["y"], bottom_right["y"])
+  )
+  
+  # Define line width
+  wdt = 10
+
+  # Clip the transect using the decimated point cloud
+  las_tr <- clip_transect(las_data, top_left, bottom_right, width = wdt, xz = TRUE)
+  
+  # Create a buffer around the transect to simulate the 10m-wide transect area (create a polygon)
+  transect_line <- st_sfc(st_linestring(matrix(c(top_left["x"], top_left["y"], bottom_right["x"], bottom_right["y"]), 
+                                               ncol = 2, byrow = TRUE)), crs = st_crs(aoi))
+  
+  # Buffer the line to create the width of the transect area
+  transect_buffer <- st_buffer(transect_line, dist = wdt, endCapStyle = "FLAT")
+  
+  # Convert the CHM raster to a data frame for ggplot
+  raster_df <- terra::as.data.frame(rast, xy = TRUE, na.rm = TRUE)
+  colnames(raster_df) <- c("X", "Y", "Height")  # Set column names for easy ggplot mapping
+  
+  # Plot 1: 2D map of the AOI with transect line
+  map_plot <- ggplot() +
+    geom_tile(data = raster_df, aes(x = X, y = Y, fill = Height)) +  # raster fill
+    scale_fill_gradientn(colours = height.colors(50), name = "CHM (m)") +  # Color scale for CHM
+    geom_sf(data = aoi, fill = NA, color = "black") +  # AOI boundary
+    geom_line(data = transect_points, aes(x = X, y = Y), color = "purple", size = 1) +  # Transect line
+    geom_sf(data = transect_buffer, fill = "purple", alpha = 0.4) +  # Transect area as a polygon
+    coord_sf() +  # Set appropriate coordinate system
+    theme_minimal() +
+    ggtitle(paste0("CHM with ", wdt, " m transect line"))
+  
+  # Plot 2: Transect plot
+  transect_plot <- ggplot(payload(las_tr), aes(X, Z, color = Z)) + 
+    geom_point(size = 0.5) + 
+    coord_equal() + 
+    theme_minimal() +
+    scale_color_gradientn(colours = height.colors(50)) +
+    ggtitle(paste0("Vertical height profile of all points in ", wdt, " m transect line"))
+  
+  # Arrange both plots together
+  library(gridExtra)
+  grid.arrange(map_plot, transect_plot, ncol = 1)
+  # map_plot
+  # transect_plot
+  
+  # Generate 3D plot
+  plot(las_tr, axis = TRUE, legend = TRUE, bg = "white", backend = "rgl")
+  axes3d(edges = "bbox")  # Add axes around the bounding box
+  title3d(xlab = "X (m)", ylab = "Y (m)", zlab = "Z (m)")
+  
+}
 
 
 ### Function to plot partial pointcloud with transect
@@ -460,41 +641,17 @@ plot_las_with_transect <- function(las_data, aoi){
 
 
 
-# ### Function to calculate BE_H indices
-# calculate_be_h_stats <- function(las_data) {
-#   # Extract heights (define the height column as Z)
-#   heights <- las_data$Z
-#   # # Replace negative height values with zero
-#   # heights[heights < 0] <- 0
-#   
-#   # Function to calculate the indices
-#   indices <- list(
-#     BE_H_MIN = min(heights, na.rm = TRUE),
-#     BE_H_MAX = max(heights, na.rm = TRUE),
-#     BE_H_MEAN = mean(heights, na.rm = TRUE),
-#     BE_H_MEDIAN = median(heights, na.rm = TRUE),
-#     BE_H_SD = sd(heights, na.rm = TRUE),
-#     BE_H_VAR = var(heights, na.rm = TRUE),
-#     BE_H_VAR_COEF = sd(heights, na.rm = TRUE) / mean(heights, na.rm = TRUE),
-#     BE_H_SKEW = e1071::skewness(heights, na.rm = TRUE),
-#     BE_H_KURTOSIS = e1071::kurtosis(heights, na.rm = TRUE)
-#   )
-#   
-#   # Percentiles
-#   percentiles <- quantile(heights, probs = seq(0, 1, 0.1), na.rm = TRUE)
-#   names(percentiles) <- c("BE_H_P0", paste0("BE_H_P", seq(10, 100, 10)))
-#   indices <- c(indices, as.list(percentiles))
-#   
-#   return(indices)
-# }
-
 calculate_be_h_stats <- function(las_data) {
   # Extract heights (define the height column as Z)
   heights <- las_data$Z
   
-  # Calculate percentiles (0%, 10%, 20%, ..., 100%)
-  percentiles <- quantile(heights, probs = seq(0, 1, 0.1), na.rm = TRUE)
-  names(percentiles) <- c("BE_H_P0", paste0("BE_H_P", seq(10, 100, 10)))
+  # # Calculate percentiles (0%, 10%, 20%, ..., 100%)
+  # percentiles <- quantile(heights, probs = seq(0, 1, 0.1), na.rm = TRUE)
+  # names(percentiles) <- c("BE_H_P0", paste0("BE_H_P", seq(10, 100, 10)))
+  
+  # Calculate percentiles (0%, 5%, 10%, ..., 100%)                                                                     # LP: 5% schritte
+  percentiles <- quantile(heights, probs = seq(0, 1, 0.05), na.rm = TRUE)
+  names(percentiles) <- c("BE_H_P0", paste0("BE_H_P", seq(5, 100, 5)))
   
   # Initialize an empty list to store the data frames for each percentile group
   percentile_stats_list <- list()
@@ -504,7 +661,7 @@ calculate_be_h_stats <- function(las_data) {
     # Filter heights that are less than or equal to the current percentile value
     filtered_heights <- heights[heights <= percentiles[[name]]]
     
-    # Calculate statistics for the filtered heights
+    # Calculate the required metrics
     stats <- data.frame(
       BE_H_MAX = max(filtered_heights, na.rm = TRUE),
       BE_H_MIN = min(filtered_heights, na.rm = TRUE),
@@ -514,7 +671,17 @@ calculate_be_h_stats <- function(las_data) {
       BE_H_VAR = var(filtered_heights, na.rm = TRUE),
       BE_H_VAR_COEF = sd(filtered_heights, na.rm = TRUE) / mean(filtered_heights, na.rm = TRUE),
       BE_H_SKEW = e1071::skewness(filtered_heights, na.rm = TRUE),
-      BE_H_KURTOSIS = e1071::kurtosis(filtered_heights, na.rm = TRUE)
+      BE_H_KURTOSIS = e1071::kurtosis(filtered_heights, na.rm = TRUE),
+
+      # # Calculate entropy (zentropy) for the percentile group
+      # library(entropy)  # For entropy calculation (install if needed)
+      # ZENTROPY = entropy::entropy(table(cut(filtered_heights, breaks = 10)), unit = "log2"),                          # LP: add ZENTROPY
+
+      # Calculate pzabovezmean (percentage of points above the mean height for the percentile group)
+      PZABOVEZMEAN = sum(filtered_heights > mean(filtered_heights, na.rm = TRUE)) / length(filtered_heights) * 100,   # LP: add PZABOVEZMEAN
+
+      # Calculate pzabove2 (percentage of points above 2 meters for the percentile group)                             # LP: add PZABOVE2
+      PZABOVE2 = sum(filtered_heights > 2) / length(filtered_heights) * 100
     )
     
     # Add the percentile value to the statistics
@@ -524,8 +691,52 @@ calculate_be_h_stats <- function(las_data) {
     percentile_stats_list[[name]] <- stats
   }
   
+  # Combine all percentile data frames into a single data frame
+  percentile_stats_list <- do.call(rbind, percentile_stats_list)
+  
   return(percentile_stats_list)
 }
+
+# calculate_be_h_stats <- function(las_data) {
+#   # Extract heights (define the height column as Z)
+#   heights <- las_data$Z
+#   
+#   # Calculate percentiles (0%, 10%, 20%, ..., 100%)
+#   percentiles <- quantile(heights, probs = seq(0, 1, 0.1), na.rm = TRUE)
+#   names(percentiles) <- c("BE_H_P0", paste0("BE_H_P", seq(10, 100, 10)))
+#   
+#   # Initialize an empty list to store the data frames for each percentile group
+#   percentile_stats_list <- list()
+#   
+#   # Loop over each percentile and calculate statistics for the heights <= percentile value
+#   for (name in names(percentiles)) {
+#     # Filter heights that are less than or equal to the current percentile value
+#     filtered_heights <- heights[heights <= percentiles[[name]]]
+#     
+#     # Calculate statistics for the filtered heights
+#     stats <- data.frame(
+#       BE_H_MAX = max(filtered_heights, na.rm = TRUE),
+#       BE_H_MIN = min(filtered_heights, na.rm = TRUE),
+#       BE_H_MEAN = mean(filtered_heights, na.rm = TRUE),
+#       BE_H_MEDIAN = median(filtered_heights, na.rm = TRUE),
+#       BE_H_SD = sd(filtered_heights, na.rm = TRUE),
+#       BE_H_VAR = var(filtered_heights, na.rm = TRUE),
+#       BE_H_VAR_COEF = sd(filtered_heights, na.rm = TRUE) / mean(filtered_heights, na.rm = TRUE),
+#       BE_H_SKEW = e1071::skewness(filtered_heights, na.rm = TRUE),
+#       BE_H_KURTOSIS = e1071::kurtosis(filtered_heights, na.rm = TRUE)
+#     )
+#     
+#     # Add the percentile value to the statistics
+#     stats$Percentile_Height <- percentiles[[name]]
+#     
+#     # Store the data frame in the list with the name of the percentile
+#     percentile_stats_list[[name]] <- stats
+#   }
+#   
+#   percentile_stats_list <- do.call(rbind, percentile_stats_list)
+#   
+#   return(percentile_stats_list)
+# }
 
 
 
@@ -581,12 +792,18 @@ calculate_layer_pointStats <- function(las_data, layer_height = 1) {
     Point_Count = Point_Count$Freq,                  # Density as points per meter height
     Penetration_Rate = Penetration_Rate$Freq
   )
+  
+  layer_density_df <- layer_density_df %>%
+    mutate(
+      Cumulative_Point_Density = cumsum(Point_Density),  # Adds a cumulative density column
+      Cumulative_Point_Count = cumsum(Point_Count)        # Adds a cumulative count column
+    )
 
   return(layer_density_df)
 }
 
 ### Function to calculate point cloud statistics (see above) per vegetation layer (defined by ground-, regeneration-, understory- and canopy-layer)
-calculate_veg_layer_pointStats <- function(las_data, grd = 2, reg = 8, und = 20) {
+calculate_veg_layer_pointStats <- function(las_data, grd = 1.5, reg = 5, und = 7) {      #grd = 2, reg = 8, und = 20
   # Specify fine-scale meter bins
   layer_height = 0.1
 
@@ -652,4 +869,26 @@ calculate_veg_layer_pointStats <- function(las_data, grd = 2, reg = 8, und = 20)
               veg_layer_stats = veg_layer_df))
 }
    
+
+
+### Function to create the density - height plot
+create_density_by_height_plot <- function(data, title) {
+  ggplot(data, aes(x = Point_Density, y = Height_Layer_m)) +
+    geom_bar(stat = "identity", fill = "lightblue", color = "lightblue", alpha = 0.7) +
+    geom_point(color = "darkgreen", size = 3, alpha = 0.7) +
+    geom_line(color = "darkgreen", group = 1, size = 1) +
+    theme_minimal() +
+    labs(title = title,     # "Point Density by Height Layer"
+         x = "Point Density", 
+         y = "Height Layer (m)") +
+    xlim(0, 0.25) +  # Set x-axis limits to 0 and 0.25
+    theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.title = element_text(size = 12),
+          axis.text = element_text(size = 5),
+          panel.grid.major = element_line(color = "gray80"),
+          panel.grid.minor = element_blank())
+} 
+
+
+
 
